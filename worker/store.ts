@@ -164,8 +164,9 @@ export function createD1StatusStore(db: D1Database): StatusStore {
           ORDER BY day, component
         `).bind(startDay, endDay),
         db.prepare(`
-          SELECT MIN(first_scheduled_at) AS monitoring_started_at
-          FROM daily_uptime
+          SELECT monitoring_started_at
+          FROM status_metadata
+          WHERE id = 1
         `),
       ]);
 

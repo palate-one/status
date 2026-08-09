@@ -26,6 +26,9 @@ async function resetDatabase(): Promise<void> {
   await env.TEST_DB.batch([
     env.TEST_DB.prepare("DELETE FROM check_samples"),
     env.TEST_DB.prepare("DELETE FROM daily_uptime"),
+    env.TEST_DB.prepare(
+      "UPDATE status_metadata SET monitoring_started_at = NULL WHERE id = 1",
+    ),
     env.TEST_DB.prepare(`
       UPDATE component_state
       SET status = 'unknown',
@@ -211,6 +214,19 @@ describe("D1 status store", () => {
 
     expect(result.monitoringStartedAt).toBe("2026-06-01T00:03:00Z");
     expect(result.daily.map(({ day }) => day)).toEqual(["2026-07-11", "2026-08-09"]);
+  });
+
+  it("reads monitoring start from bounded singleton metadata", async () => {
+    await store.insertSamples([sample("web", "2026-06-01T00:03:00Z", "up")]);
+    await env.TEST_DB.prepare("DELETE FROM daily_uptime").run();
+
+    const result = await store.readStatus(new Date("2026-08-09T12:00:00Z"));
+    const metadata = await env.TEST_DB.prepare(
+      "SELECT monitoring_started_at FROM status_metadata WHERE id = 1",
+    ).first<{ monitoring_started_at: string | null }>();
+
+    expect(result.monitoringStartedAt).toBe("2026-06-01T00:03:00Z");
+    expect(metadata?.monitoring_started_at).toBe("2026-06-01T00:03:00Z");
   });
 
   it("rolls back the whole envelope when one sample fails", async () => {
