@@ -10,6 +10,7 @@ import { createWorker as createIngestWorker } from "./ingest";
 import { createD1StatusStore, type DailyAggregateRow, type StatusSnapshot, type StatusStore } from "./store";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
+const STATUS_CACHE_KEY = "public-status";
 const COMPONENTS = ["web", "api"] as const satisfies readonly ComponentId[];
 const componentLabels = {
   web: "Web",
@@ -44,6 +45,7 @@ export type PublicStatusResponse = {
 export type PublicStatusWorkerOptions = {
   now?: () => Date;
   storeFactory?: (db: D1Database) => StatusStore;
+  cache?: Pick<Cache, "match" | "put">;
 };
 
 function dayStart(day: string): number {
@@ -189,7 +191,7 @@ function publicStatusResponse(body: PublicStatusResponse): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
+      "Cache-Control": "public, max-age=60",
       "Content-Type": "application/json; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
     },
@@ -207,17 +209,65 @@ export function createPublicStatusWorker(
 
   return {
     async fetch(request, env, ctx): Promise<Response> {
-      const pathname = new URL(request.url).pathname;
+      const url = new URL(request.url);
+      const { pathname } = url;
 
       if (pathname === "/api/status") {
         if (request.method !== "GET") {
           return methodNotAllowed("GET");
         }
 
+        if (url.search !== "") {
+          return new Response("invalid request", {
+            status: 400,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+
+        const cache = options.cache ?? caches.default;
+        const cacheKey = new Request(url.origin + pathname, { method: "GET" });
+        try {
+          const cached = await cache.match(cacheKey);
+          if (cached !== undefined) {
+            return cached;
+          }
+        } catch {
+          console.error("public status cache read failed");
+        }
+
+        try {
+          const rateLimit = await env.STATUS_READ_LIMITER.limit({
+            key: STATUS_CACHE_KEY,
+          });
+          if (!rateLimit.success) {
+            return new Response("too many requests", {
+              status: 429,
+              headers: {
+                "Content-Type": "text/plain; charset=utf-8",
+                "Retry-After": "60",
+              },
+            });
+          }
+        } catch {
+          console.error("public status rate limit failed");
+          return new Response("temporarily unavailable", {
+            status: 503,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+
         try {
           const generatedAt = now();
           const snapshot = await storeFactory(env.DB).readStatus(generatedAt);
-          return publicStatusResponse(projectPublicStatus(snapshot, generatedAt));
+          const response = publicStatusResponse(
+            projectPublicStatus(snapshot, generatedAt),
+          );
+          ctx.waitUntil(
+            cache.put(cacheKey, response.clone()).catch(() => {
+              console.error("public status cache write failed");
+            }),
+          );
+          return response;
         } catch {
           console.error("public status read failed");
           return new Response("temporarily unavailable", {

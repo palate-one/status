@@ -6,6 +6,7 @@ import type {
 
 export type Env = Pick<Cloudflare.Env, "DB" | "ASSETS"> & {
   STATUS_INGEST_SECRET: string;
+  STATUS_READ_LIMITER: RateLimit;
 };
 
 export type IngestPayload = {

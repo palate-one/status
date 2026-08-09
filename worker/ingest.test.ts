@@ -46,6 +46,7 @@ const env = {
   DB: {} as D1Database,
   ASSETS: { fetch: vi.fn() } as unknown as Fetcher,
   STATUS_INGEST_SECRET: SECRET,
+  STATUS_READ_LIMITER: { limit: vi.fn() } as unknown as RateLimit,
 } satisfies Env;
 
 const executionContext = {

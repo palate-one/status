@@ -51,6 +51,25 @@ function createEnv(): Env {
       fetch: vi.fn().mockResolvedValue(new Response("asset", { status: 200 })),
     } as unknown as Fetcher,
     STATUS_INGEST_SECRET: "test-only-secret",
+    STATUS_READ_LIMITER: {
+      limit: vi.fn().mockResolvedValue({ success: true }),
+    } as RateLimit,
+  };
+}
+
+type TestCache = Pick<Cache, "match" | "put">;
+
+function createCache(): TestCache {
+  const entries = new Map<string, Response>();
+  return {
+    match: vi.fn(async (request: RequestInfo) => {
+      const key = typeof request === "string" ? request : request.url;
+      return entries.get(key)?.clone();
+    }),
+    put: vi.fn(async (request: RequestInfo, response: Response) => {
+      const key = typeof request === "string" ? request : request.url;
+      entries.set(key, response.clone());
+    }),
   };
 }
 
@@ -164,10 +183,12 @@ describe("public status routing", () => {
     request: Request,
     store = createStore(),
     env = createEnv(),
+    cache = createCache(),
   ): Promise<{ response: Response; env: Env }> {
     const worker = createPublicStatusWorker({
       now: () => NOW,
       storeFactory: () => store,
+      cache,
     });
     return {
       response: await worker.fetch(request, env, executionContext),
@@ -184,10 +205,57 @@ describe("public status routing", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("application/json; charset=utf-8");
     expect(response.headers.get("Cache-Control")).toBe(
-      "public, max-age=60, stale-while-revalidate=120",
+      "public, max-age=60",
     );
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(body.generatedAt).toBe(NOW.toISOString());
+  });
+
+  it("rejects cache-busting query strings before D1", async () => {
+    const store = createStore();
+    const env = createEnv();
+
+    const { response } = await fetchStatus(
+      new Request("https://status.palate.one/api/status?nonce=attacker"),
+      store,
+      env,
+    );
+
+    expect(response.status).toBe(400);
+    expect(store.readStatus).not.toHaveBeenCalled();
+    expect(env.STATUS_READ_LIMITER.limit).not.toHaveBeenCalled();
+  });
+
+  it("serves repeated status reads from one canonical cache entry", async () => {
+    const store = createStore();
+    const env = createEnv();
+    const cache = createCache();
+    const request = new Request("https://status.palate.one/api/status");
+
+    const first = await fetchStatus(request, store, env, cache);
+    const second = await fetchStatus(request, store, env, cache);
+
+    expect(first.response.status).toBe(200);
+    expect(second.response.status).toBe(200);
+    expect(store.readStatus).toHaveBeenCalledOnce();
+    expect(env.STATUS_READ_LIMITER.limit).toHaveBeenCalledOnce();
+    expect(cache.put).toHaveBeenCalledOnce();
+  });
+
+  it("returns 429 before D1 when cache-miss budget is exhausted", async () => {
+    const store = createStore();
+    const env = createEnv();
+    vi.mocked(env.STATUS_READ_LIMITER.limit).mockResolvedValue({ success: false });
+
+    const { response } = await fetchStatus(
+      new Request("https://status.palate.one/api/status"),
+      store,
+      env,
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(store.readStatus).not.toHaveBeenCalled();
   });
 
   it("returns generic 503 without leaking a D1 error", async () => {
@@ -196,10 +264,13 @@ describe("public status routing", () => {
       readStatus: vi.fn().mockRejectedValue(new Error(sensitive)),
     });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const cache = createCache();
 
     const { response } = await fetchStatus(
       new Request("https://status.palate.one/api/status"),
       store,
+      createEnv(),
+      cache,
     );
     const body = await response.text();
     const logs = errorSpy.mock.calls.flat().join(" ");
@@ -209,6 +280,7 @@ describe("public status routing", () => {
     expect(body).toBe("temporarily unavailable");
     expect(body).not.toContain(sensitive);
     expect(logs).not.toContain(sensitive);
+    expect(cache.put).not.toHaveBeenCalled();
   });
 
   it.each([
