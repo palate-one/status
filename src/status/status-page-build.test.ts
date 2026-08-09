@@ -19,4 +19,12 @@ describe("status page build", () => {
     expect(html).toContain("측정 데이터 없음");
     expect(html).not.toContain("Read uptime graph for undefined");
   });
+
+  it("uses the readable muted token for the small uptime note", async () => {
+    const css = await readFile("src/styles/global.css", "utf8");
+    const noteRule = css.match(/\.uptime-note\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(noteRule).toContain("color: var(--text-muted);");
+    expect(noteRule).not.toContain("var(--text-faint)");
+  });
 });
