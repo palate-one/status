@@ -104,6 +104,14 @@ a {
   text-decoration: none;
 }
 
+.brand-logo {
+  display: block;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
 .brand span {
   margin-left: 6px;
   color: var(--coral);
@@ -271,7 +279,7 @@ h4 {
 
 .component-status {
   display: grid;
-  grid-template-columns: minmax(100px, 0.7fr) minmax(220px, 1.3fr) minmax(0, 2fr);
+  grid-template-columns: minmax(max-content, 0.7fr) minmax(220px, 1.3fr) minmax(0, 2fr);
   align-items: start;
   gap: 20px;
   min-width: 0;
@@ -286,9 +294,15 @@ h4 {
   gap: 12px;
 }
 
+.component-heading h3 {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .component-state {
   margin: 0;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .component-state .status-mark {
@@ -318,7 +332,8 @@ h4 {
   margin: 3px 0 0;
   font-size: 14px;
   font-weight: 600;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
 
 .uptime-block {

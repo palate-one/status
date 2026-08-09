@@ -19,6 +19,22 @@ describe("status page build", () => {
     expect(html).toContain('data-uptime-placeholder aria-hidden="true"');
     expect(html).toContain("측정 데이터 없음");
     expect(html).not.toContain("Read uptime graph for undefined");
+    expect(html).toContain('src="/palate-logo.svg"');
+    expect(html).toContain('aria-label="Palate 상태 페이지 홈"');
+  });
+
+  it("keeps service names and mobile metric values readable", async () => {
+    const css = await readFile("src/styles/global.css", "utf8");
+    const gridRule = css.match(/\.component-status\s*\{([^}]*)\}/)?.[1] ?? "";
+    const headingRule = css.match(/\.component-heading h3\s*\{([^}]*)\}/)?.[1] ?? "";
+    const stateRule = css.match(/\.component-state\s*\{\s*margin:\s*0;([^}]*)\}/)?.[1] ?? "";
+    const metricRule = css.match(/\.component-metrics dd\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(gridRule).toContain("minmax(max-content, 0.7fr)");
+    expect(headingRule).toContain("white-space: nowrap;");
+    expect(stateRule).toContain("white-space: nowrap;");
+    expect(metricRule).toContain("word-break: keep-all;");
+    expect(metricRule).toContain("overflow-wrap: normal;");
   });
 
   it("uses the readable muted token for the small uptime note", async () => {
