@@ -32,7 +32,7 @@ D1 daily aggregate
 
 | 공개 상태 | 의미 |
 | --- | --- |
-| `정상` | 최근 관측이 성공했다. |
+| `정상` | 관측이 최신이며 연속 두 번 실패하는 장애 확정 조건에 아직 도달하지 않았다. |
 | `문제 발생` | 같은 component에서 연속 두 번 실패했다. |
 | `상태 확인 불가` | 관측이 없거나 마지막 관측 후 15분을 초과했다. |
 
@@ -64,8 +64,12 @@ D1 daily aggregate
 ```sh
 bun install --frozen-lockfile
 bunx wrangler d1 migrations apply palate-status --local
-STATUS_INGEST_SECRET="$(openssl rand -hex 32)" bun run dev
+umask 077
+openssl rand -hex 32 | awk '{ print "STATUS_INGEST_SECRET=" $0 }' > .dev.vars
+bun run dev
 ```
+
+Wrangler는 `.dev.vars`를 local Worker binding으로 읽는다. 이 파일은 Git에서 제외되며 commit하지 않는다. 작업이 끝나면 local secret file을 삭제한다.
 
 주요 검증:
 
