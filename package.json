@@ -1,0 +1,22 @@
+{
+  "name": "@palate-one/status",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "check": "astro check && tsc -p tsconfig.worker.json --noEmit",
+    "test": "vitest run",
+    "build": "astro build",
+    "cf:typecheck": "wrangler types && tsc -p tsconfig.worker.json --noEmit",
+    "cf:build": "astro build && wrangler deploy --dry-run --outdir .wrangler-dist",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@cloudflare/vitest-pool-workers": "0.20.3",
+    "@cloudflare/workers-types": "5.20260809.1",
+    "astro": "7.2.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.120.0"
+  }
+}
