@@ -5,6 +5,10 @@ import {
 import { defineConfig } from "vitest/config";
 
 const migrationsPath = new URL("./migrations", import.meta.url).pathname;
+const contentBuildTests = [
+  "src/status/content-build.test.ts",
+  "src/status/content-removal-build.test.ts",
+];
 
 export default defineConfig({
   test: {
@@ -17,6 +21,16 @@ export default defineConfig({
             "src/**/*.test.ts",
             "scripts/**/*.test.ts",
           ],
+          exclude: contentBuildTests,
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        test: {
+          name: "content-build",
+          include: contentBuildTests,
+          fileParallelism: false,
+          sequence: { groupOrder: 1 },
         },
       },
       {
@@ -35,6 +49,7 @@ export default defineConfig({
           name: "worker",
           include: ["worker/**/*.test.ts"],
           setupFiles: ["./test/apply-migrations.ts"],
+          sequence: { groupOrder: 0 },
         },
       },
     ],
