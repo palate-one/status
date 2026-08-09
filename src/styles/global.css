@@ -122,7 +122,33 @@ a {
 }
 
 .overall-status {
-  padding-block: 40px 36px;
+  margin-top: 24px;
+  padding: 40px 24px 36px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.overall-status.status-operational {
+  border-color: #b7ddcf;
+  background: var(--green-soft);
+}
+
+.overall-status.status-service_disruption {
+  border-color: #edb5be;
+  background: var(--red-soft);
+}
+
+.overall-status.status-verification_unavailable {
+  border-color: var(--divider-strong);
+  background: var(--unknown-soft);
+}
+
+.overall-status + .status-section {
+  padding-top: 40px;
+}
+
+.overall-status {
   border-bottom: 1px solid var(--divider-strong);
 }
 
@@ -239,13 +265,16 @@ h4 {
 
 .component-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0 32px;
+  gap: 0;
 }
 
 .component-status {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.7fr) minmax(220px, 1.3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 20px;
   min-width: 0;
-  padding-block: 20px;
+  padding-block: 24px;
   border-top: 1px solid var(--divider);
 }
 
@@ -272,7 +301,7 @@ h4 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin: 18px 0 0;
+  margin: 0;
 }
 
 .component-metrics div {
@@ -289,11 +318,6 @@ h4 {
   font-size: 14px;
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-
-.uptime-list {
-  display: grid;
-  gap: 28px;
 }
 
 .uptime-block {
@@ -316,73 +340,60 @@ h4 {
 
 .uptime-rail {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(62px, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(30, minmax(0, 1fr));
+  gap: 2px;
+  height: 42px;
+  max-width: 100%;
   margin: 0;
-  padding: 0 0 8px;
-  overflow-x: auto;
+  padding: 0;
+  overflow-x: hidden;
   list-style: none;
-  scrollbar-color: var(--divider-strong) transparent;
 }
 
-.uptime-day,
-.empty-day {
-  display: grid;
-  min-height: 96px;
-  align-content: start;
-  gap: 5px;
-  padding: 9px 8px;
+.uptime-day {
+  min-width: 0;
+  height: 42px;
   border: 1px solid var(--divider);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 12px;
+  border-radius: 3px;
+  background: var(--unknown-soft);
 }
 
 .uptime-day.is-up {
-  border-top: 3px solid var(--green);
+  border-color: var(--green);
+  background: var(--green);
 }
 
 .uptime-day.has-down {
-  border-top: 3px solid var(--red);
+  border-color: var(--red);
   background: var(--red-soft);
 }
 
 .uptime-day.is-empty,
-.empty-day {
-  border-top: 3px solid var(--unknown);
+.uptime-day.is-placeholder {
+  border-color: var(--unknown);
   background: var(--unknown-soft);
 }
 
-.empty-day {
-  grid-column: 1 / -1;
-  min-height: 60px;
-  place-items: center start;
+.uptime-day.has-down::after {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--red);
+  content: "";
 }
 
 .day-mark {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.is-up .day-mark {
-  color: var(--green);
-}
-
-.has-down .day-mark {
-  color: var(--red);
-}
-
-.day-label {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.day-counts,
-.day-coverage {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+.uptime-empty-label {
+  grid-column: 1 / -1;
 }
 
 .uptime-note {
@@ -547,6 +558,18 @@ h4 {
   color: var(--text-muted);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 679px) {
   .site-header-inner,
   .status-content {
@@ -566,16 +589,25 @@ h4 {
     display: block;
   }
 
+  .component-status {
+    display: block;
+  }
+
   .component-status + .component-status {
     margin-top: 4px;
   }
 
   .component-metrics {
     gap: 8px;
+    margin-top: 18px;
   }
 
   .uptime-rail {
-    grid-auto-columns: 64px;
+    height: 34px;
+  }
+
+  .uptime-day {
+    height: 34px;
   }
 }
 

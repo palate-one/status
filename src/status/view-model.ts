@@ -3,6 +3,7 @@ import type { DailyUptimePoint, PublicStatusResponse } from "../../worker/read";
 import type { ComponentId, PublicComponentStatus } from "./types";
 
 const STALE_AFTER_MS = 15 * 60 * 1_000;
+const DAY_MS = 24 * 60 * 60 * 1_000;
 
 export type StatusContentEntry<T> = {
   id?: string;
@@ -210,7 +211,7 @@ function isResponseStale(response: PublicStatusResponse, now: Date): boolean {
   );
 }
 
-function viewDays(days: DailyUptimePoint[]): DailyUptimeViewModel[] {
+function viewDays(days: readonly DailyUptimePoint[]): DailyUptimeViewModel[] {
   return days.map((day) => {
     const dateLabel = formatDate(day.day);
     const uptimeLabel = formatUptime(day.uptimePercent);
@@ -223,6 +224,35 @@ function viewDays(days: DailyUptimePoint[]): DailyUptimeViewModel[] {
       ariaLabel: `${dateLabel}, 가동률 ${uptimeLabel}, 정상 ${day.upSamples}회, 문제 ${day.downSamples}회, 측정 범위 ${coverageLabel}`,
     };
   });
+}
+
+export function buildThirtyDayUptimeRail(
+  days: readonly DailyUptimePoint[],
+  now: Date,
+): DailyUptimeViewModel[] {
+  if (!Number.isFinite(now.getTime())) {
+    return viewDays(days);
+  }
+
+  const todayStart = Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00Z`);
+  const byDay = new Map(days.map((day) => [day.day, day]));
+  const projected: DailyUptimePoint[] = [];
+
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const day = new Date(todayStart - offset * DAY_MS).toISOString().slice(0, 10);
+    projected.push(
+      byDay.get(day) ?? {
+        day,
+        upSamples: 0,
+        downSamples: 0,
+        expectedSamples: 0,
+        uptimePercent: null,
+        coveragePercent: 0,
+      },
+    );
+  }
+
+  return viewDays(projected);
 }
 
 export function toStatusViewModel(
@@ -242,7 +272,7 @@ export function toStatusViewModel(
       uptimeLabel: formatUptime(component.uptime30d),
       coverageLabel: formatUptime(component.coverage30d),
       lastCheckedLabel: formatDateTime(component.lastCheckedAt),
-      days: viewDays(component.days),
+      days: buildThirtyDayUptimeRail(component.days, now),
     } satisfies ComponentStatusViewModel;
   });
 

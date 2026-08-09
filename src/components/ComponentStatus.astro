@@ -1,5 +1,6 @@
 ---
 import type { ComponentStatusViewModel } from "../status/view-model";
+import UptimeBars from "./UptimeBars.astro";
 
 interface Props {
   component: ComponentStatusViewModel;
@@ -37,4 +38,5 @@ const mark = component.status === "operational" ? "✓" : component.status === "
       <dd data-component-last-checked>{component.lastCheckedLabel}</dd>
     </div>
   </dl>
+  <UptimeBars componentLabel={component.label} days={component.days} />
 </article>

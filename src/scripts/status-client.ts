@@ -4,6 +4,7 @@ import type { PublicStatusResponse } from "../../worker/read";
 const publicStatuses = new Set(["operational", "outage", "unknown"]);
 const overallStatuses = new Set(["operational", "service_disruption", "verification_unavailable"]);
 const STALE_AFTER_MS = 15 * 60 * 1_000;
+const UPTIME_RAIL_LENGTH = 30;
 const staleCancellations = new WeakMap<ParentNode, () => void>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -157,13 +158,25 @@ function updateComponent(root: ParentNode, component: ComponentStatusViewModel):
   if (stateLabel) stateLabel.setAttribute("aria-label", `${component.label} 상태: ${component.statusLabel}`);
 }
 
+function renderPlaceholderDays(list: HTMLOListElement): void {
+  const document = list.ownerDocument;
+  const placeholders = Array.from({ length: UPTIME_RAIL_LENGTH }, () => {
+    const item = document.createElement("li");
+    item.className = "uptime-day is-placeholder";
+    item.dataset.uptimePlaceholder = "";
+    item.setAttribute("aria-hidden", "true");
+    return item;
+  });
+  const unavailable = document.createElement("li");
+  unavailable.className = "uptime-empty-label sr-only";
+  unavailable.textContent = "측정 데이터 없음";
+  list.replaceChildren(...placeholders, unavailable);
+}
+
 function renderDays(list: HTMLOListElement, days: readonly DailyUptimeViewModel[]): void {
   const document = list.ownerDocument;
   if (days.length === 0) {
-    list.replaceChildren(Object.assign(document.createElement("li"), {
-      className: "empty-day",
-      textContent: "측정 데이터 없음",
-    }));
+    renderPlaceholderDays(list);
     return;
   }
 
@@ -172,24 +185,13 @@ function renderDays(list: HTMLOListElement, days: readonly DailyUptimeViewModel[
     item.className = `uptime-day ${day.uptimePercent === null ? "is-empty" : day.downSamples > 0 ? "has-down" : "is-up"}`;
     item.dataset.uptimeDay = day.day;
     item.setAttribute("aria-label", day.ariaLabel);
+    item.title = day.ariaLabel;
 
     const mark = document.createElement("span");
     mark.className = "day-mark";
     mark.setAttribute("aria-hidden", "true");
     mark.textContent = day.uptimePercent === null ? "—" : day.downSamples > 0 ? "!" : "✓";
-    const date = document.createElement("span");
-    date.className = "day-label";
-    date.textContent = day.dateLabel;
-    const counts = document.createElement("span");
-    counts.className = "day-counts";
-    counts.textContent = `${day.upSamples}↑ · ${day.downSamples}↓`;
-    const coverage = document.createElement("span");
-    coverage.className = "day-coverage";
-    coverage.textContent = day.coverageLabel;
     item.appendChild(mark);
-    item.appendChild(date);
-    item.appendChild(counts);
-    item.appendChild(coverage);
     return item;
   });
   list.replaceChildren(...items);
@@ -226,6 +228,10 @@ function renderUnavailable(root: ParentNode): void {
     if (label) label.textContent = "상태 확인 불가";
     const lastChecked = element.querySelector<HTMLElement>("[data-component-last-checked]");
     if (lastChecked) lastChecked.textContent = "상태 확인 불가";
+  });
+
+  root.querySelectorAll<HTMLOListElement>("[data-uptime-list]").forEach((list) => {
+    renderPlaceholderDays(list);
   });
 }
 

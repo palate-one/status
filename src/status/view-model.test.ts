@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PublicStatusResponse } from "../../worker/read";
 import {
+  buildThirtyDayUptimeRail,
   formatUptime,
   sortIncidentHistory,
   sortIncidents,
@@ -44,6 +45,88 @@ function response(overrides: Partial<PublicStatusResponse> = {}): PublicStatusRe
 }
 
 describe("status view model", () => {
+  it("projects observations onto a fixed UTC 30-day rail", () => {
+    const rail = buildThirtyDayUptimeRail(
+      [
+        {
+          day: "2026-08-08",
+          upSamples: 280,
+          downSamples: 8,
+          expectedSamples: 288,
+          uptimePercent: 97.22,
+          coveragePercent: 100,
+        },
+        {
+          day: "2026-08-09",
+          upSamples: 12,
+          downSamples: 0,
+          expectedSamples: 12,
+          uptimePercent: 100,
+          coveragePercent: 4.17,
+        },
+      ],
+      NOW,
+    );
+
+    expect(rail).toHaveLength(30);
+    expect(rail[0].day).toBe("2026-07-11");
+    expect(rail.at(-1)?.day).toBe("2026-08-09");
+    expect(rail[0]).toMatchObject({
+      uptimePercent: null,
+      expectedSamples: 0,
+      coveragePercent: 0,
+    });
+    expect(rail[0].ariaLabel).toContain("가동률 측정 데이터 없음");
+    expect(rail.at(-2)).toMatchObject({
+      day: "2026-08-08",
+      uptimePercent: 97.22,
+      upSamples: 280,
+      downSamples: 8,
+    });
+  });
+
+  it("uses the fixed rail for every component", () => {
+    const model = toStatusViewModel(
+      response({
+        components: response().components.map((component) => ({
+          ...component,
+          days: [
+            {
+              day: "2026-08-09",
+              upSamples: 1,
+              downSamples: 0,
+              expectedSamples: 1,
+              uptimePercent: 100,
+              coveragePercent: 100,
+            },
+          ],
+        })),
+      }),
+      NOW,
+    );
+
+    expect(model.components.map(({ days }) => days.length)).toEqual([30, 30]);
+    expect(model.components.every(({ days }) => days.at(-1)?.day === "2026-08-09")).toBe(true);
+  });
+
+  it("keeps received samples when the projection time is invalid", () => {
+    const [sample] = buildThirtyDayUptimeRail(
+      [
+        {
+          day: "2026-08-09",
+          upSamples: 1,
+          downSamples: 0,
+          expectedSamples: 1,
+          uptimePercent: 100,
+          coveragePercent: 100,
+        },
+      ],
+      new Date(Number.NaN),
+    );
+
+    expect(sample).toMatchObject({ day: "2026-08-09", uptimeLabel: "100%" });
+  });
+
   it("maps public states to Korean labels and readable percentages", () => {
     const model = toStatusViewModel(response(), NOW);
 

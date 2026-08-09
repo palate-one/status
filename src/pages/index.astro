@@ -6,7 +6,6 @@ import IncidentList from "../components/IncidentList.astro";
 import MaintenanceList from "../components/MaintenanceList.astro";
 import OverallStatus from "../components/OverallStatus.astro";
 import StatusLayout from "../layouts/StatusLayout.astro";
-import UptimeBars from "../components/UptimeBars.astro";
 import type { ComponentStatusViewModel } from "../status/view-model";
 
 const incidents = await getCollection("incidents");
@@ -55,23 +54,10 @@ const initialComponents: ComponentStatusViewModel[] = [
       <section class="status-section" aria-labelledby="components-heading">
         <div class="section-heading">
           <p class="eyebrow">서비스 구성 요소</p>
-          <h2 id="components-heading">Web과 API</h2>
+          <h2 id="components-heading">서비스 상태와 최근 30일 가동률</h2>
         </div>
         <div class="component-grid" data-component-list>
           {initialComponents.map((component) => <ComponentStatus component={component} loading />)}
-        </div>
-      </section>
-
-      <section class="status-section uptime-section" aria-labelledby="uptime-heading">
-        <div class="section-heading">
-          <p class="eyebrow">측정 기록</p>
-          <h2 id="uptime-heading">최근 30일 업타임</h2>
-          <p class="section-description">정상·문제 표본과 측정 범위를 함께 보여줘요. 빈 날은 장애가 아니라 관측 없음이에요.</p>
-        </div>
-        <div class="uptime-list" data-uptime-components>
-          {initialComponents.map((component) => (
-            <UptimeBars componentLabel={component.label} days={component.days} />
-          ))}
         </div>
       </section>
 

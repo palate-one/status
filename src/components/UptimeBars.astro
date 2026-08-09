@@ -7,6 +7,7 @@ interface Props {
 }
 
 const { componentLabel, days } = Astro.props;
+const placeholderCount = 30;
 ---
 
 <section
@@ -16,11 +17,16 @@ const { componentLabel, days } = Astro.props;
 >
   <div class="uptime-heading">
     <h4 id={`${componentLabel.toLowerCase()}-uptime-heading`}>{componentLabel} 최근 30일</h4>
-    <p>하루별 관측 기록</p>
+    <p>UTC 기준</p>
   </div>
   <ol class="uptime-rail" data-uptime-list>
     {days.length === 0 ? (
-      <li class="empty-day">측정 데이터 없음</li>
+      <>
+        {Array.from({ length: placeholderCount }).map(() => (
+          <li class="uptime-day is-placeholder" data-uptime-placeholder aria-hidden="true"></li>
+        ))}
+        <li class="uptime-empty-label sr-only">측정 데이터 없음</li>
+      </>
     ) : (
       days.map((day) => (
         <li
@@ -30,16 +36,14 @@ const { componentLabel, days } = Astro.props;
           ]}
           data-uptime-day={day.day}
           aria-label={day.ariaLabel}
+          title={day.ariaLabel}
         >
           <span class="day-mark" aria-hidden="true">
             {day.uptimePercent === null ? "—" : day.downSamples > 0 ? "!" : "✓"}
           </span>
-          <span class="day-label">{day.dateLabel}</span>
-          <span class="day-counts">{day.upSamples}↑ · {day.downSamples}↓</span>
-          <span class="day-coverage">{day.coverageLabel}</span>
         </li>
       ))
     )}
   </ol>
-  <p class="uptime-note">각 칸을 선택하지 않아도 날짜, 정상·문제 횟수, 측정 범위를 읽을 수 있어요.</p>
+  <p class="uptime-note">각 칸에 마우스를 올리면 날짜와 관측 범위를 확인할 수 있어요.</p>
 </section>
