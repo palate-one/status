@@ -54,7 +54,7 @@ describe("status view model", () => {
       uptimeLabel: "99.5%",
       coverageLabel: "98.13%",
     });
-    expect(formatUptime(null)).toBe("데이터 없음");
+    expect(formatUptime(null)).toBe("측정 데이터 없음");
     expect(formatUptime(100)).toBe("100%");
   });
 
@@ -91,9 +91,26 @@ describe("status view model", () => {
 
     expect(model.overallLabel).toBe("상태 확인 불가");
     expect(model.components.map(({ statusLabel, uptimeLabel }) => [statusLabel, uptimeLabel])).toEqual([
-      ["상태 확인 불가", "데이터 없음"],
-      ["상태 확인 불가", "데이터 없음"],
+      ["상태 확인 불가", "측정 데이터 없음"],
+      ["상태 확인 불가", "측정 데이터 없음"],
     ]);
+  });
+
+  it("keeps outage precedence when another component is unknown", () => {
+    const base = response();
+    const model = toStatusViewModel(
+      response({
+        overall: "service_disruption",
+        components: [
+          { ...base.components[0], status: "outage" },
+          { ...base.components[1], status: "unknown" },
+        ],
+      }),
+      NOW,
+    );
+
+    expect(model.overallStatus).toBe("service_disruption");
+    expect(model.overallLabel).toBe("서비스 문제 발생");
   });
 
   it("turns an older API response into an unknown state on the client", () => {

@@ -15,7 +15,7 @@ const { componentLabel, days } = Astro.props;
   aria-labelledby={`${componentLabel.toLowerCase()}-uptime-heading`}
 >
   <div class="uptime-heading">
-    <h4 id={`${componentLabel.toLowerCase()}-uptime-heading`}>최근 30일</h4>
+    <h4 id={`${componentLabel.toLowerCase()}-uptime-heading`}>{componentLabel} 최근 30일</h4>
     <p>하루별 관측 기록</p>
   </div>
   <ol class="uptime-rail" data-uptime-list>

@@ -3,41 +3,113 @@ import type { PublicStatusResponse } from "../../worker/read";
 
 const publicStatuses = new Set(["operational", "outage", "unknown"]);
 const overallStatuses = new Set(["operational", "service_disruption", "verification_unavailable"]);
+const STALE_AFTER_MS = 15 * 60 * 1_000;
+const staleCancellations = new WeakMap<ParentNode, () => void>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isPublicStatusResponse(value: unknown): value is PublicStatusResponse {
-  if (!isRecord(value) || typeof value.generatedAt !== "string" || !overallStatuses.has(String(value.overall))) {
+function isTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function isPercentage(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+export function isPublicStatusResponse(value: unknown): value is PublicStatusResponse {
+  if (
+    !isRecord(value) ||
+    !isTimestamp(value.generatedAt) ||
+    !overallStatuses.has(String(value.overall))
+  ) {
     return false;
   }
-  if (value.monitoringStartedAt !== null && typeof value.monitoringStartedAt !== "string") {
+  if (value.monitoringStartedAt !== null && !isTimestamp(value.monitoringStartedAt)) {
     return false;
   }
-  if (!Array.isArray(value.components)) {
+  if (!Array.isArray(value.components) || value.components.length !== 2) {
     return false;
   }
-  return value.components.every((component) => {
+
+  const componentIds = new Set<string>();
+  const componentsAreValid = value.components.every((component) => {
     if (!isRecord(component)) return false;
     if (component.id !== "web" && component.id !== "api") return false;
-    if (component.label !== "Web" && component.label !== "API") return false;
+    if (componentIds.has(component.id)) return false;
+    componentIds.add(component.id);
+    if (
+      (component.id === "web" && component.label !== "Web") ||
+      (component.id === "api" && component.label !== "API")
+    ) {
+      return false;
+    }
     if (typeof component.status !== "string" || !publicStatuses.has(component.status)) return false;
-    if (component.lastCheckedAt !== null && typeof component.lastCheckedAt !== "string") return false;
-    if (component.lastSuccessAt !== null && typeof component.lastSuccessAt !== "string") return false;
-    if (component.uptime30d !== null && typeof component.uptime30d !== "number") return false;
-    if (typeof component.coverage30d !== "number" || !Array.isArray(component.days)) return false;
+    if (component.lastCheckedAt !== null && !isTimestamp(component.lastCheckedAt)) return false;
+    if (component.lastSuccessAt !== null && !isTimestamp(component.lastSuccessAt)) return false;
+    if (component.uptime30d !== null && !isPercentage(component.uptime30d)) return false;
+    if (!isPercentage(component.coverage30d) || !Array.isArray(component.days)) return false;
+    if (component.days.length > 30) return false;
     return component.days.every((day) => {
-      if (!isRecord(day) || typeof day.day !== "string") return false;
+      if (!isRecord(day) || typeof day.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day.day)) {
+        return false;
+      }
       return (
-        typeof day.upSamples === "number" &&
-        typeof day.downSamples === "number" &&
-        typeof day.expectedSamples === "number" &&
-        (day.uptimePercent === null || typeof day.uptimePercent === "number") &&
-        typeof day.coveragePercent === "number"
+        isCount(day.upSamples) &&
+        isCount(day.downSamples) &&
+        isCount(day.expectedSamples) &&
+        day.upSamples + day.downSamples <= day.expectedSamples &&
+        (day.uptimePercent === null || isPercentage(day.uptimePercent)) &&
+        isPercentage(day.coveragePercent)
       );
     });
   });
+
+  return componentsAreValid && componentIds.has("web") && componentIds.has("api");
+}
+
+export type StaleTransitionOptions = {
+  now?: () => Date;
+  schedule?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
+  cancel?: (handle: ReturnType<typeof setTimeout>) => void;
+};
+
+export function scheduleStaleTransition(
+  response: PublicStatusResponse,
+  render: (model: StatusViewModel) => void,
+  options: StaleTransitionOptions = {},
+): () => void {
+  const now = options.now ?? (() => new Date());
+  const schedule = options.schedule ?? setTimeout;
+  const cancel = options.cancel ?? clearTimeout;
+  const currentMs = now().getTime();
+  const generatedAtMs = Date.parse(response.generatedAt);
+  if (
+    !Number.isFinite(currentMs) ||
+    !Number.isFinite(generatedAtMs) ||
+    currentMs - generatedAtMs > STALE_AFTER_MS
+  ) {
+    return () => undefined;
+  }
+
+  let active = true;
+  const delayMs = generatedAtMs + STALE_AFTER_MS - currentMs + 1;
+  const handle = schedule(() => {
+    if (!active) return;
+    active = false;
+    render(toStatusViewModel(response, now()));
+  }, delayMs);
+
+  return () => {
+    if (!active) return;
+    active = false;
+    cancel(handle);
+  };
 }
 
 function statusMark(status: ComponentStatusViewModel["status"] | PublicStatusResponse["overall"]): string {
@@ -171,6 +243,9 @@ export async function hydrateStatus(
   fetcher: typeof fetch = window.fetch.bind(window),
   root: ParentNode = document,
 ): Promise<void> {
+  staleCancellations.get(root)?.();
+  staleCancellations.delete(root);
+
   try {
     const response = await fetcher("/api/status", {
       cache: "no-store",
@@ -180,6 +255,11 @@ export async function hydrateStatus(
     const payload: unknown = await response.json();
     if (!isPublicStatusResponse(payload)) throw new Error("invalid status response");
     renderStatusModel(root, toStatusViewModel(payload, new Date()));
+    const cancelStaleTransition = scheduleStaleTransition(payload, (model) => {
+      staleCancellations.delete(root);
+      renderStatusModel(root, model);
+    });
+    staleCancellations.set(root, cancelStaleTransition);
   } catch {
     renderUnavailable(root);
     const page = root.querySelector<HTMLElement>("[data-status-page]");

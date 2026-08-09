@@ -68,7 +68,7 @@ function roundPercent(value: number): number {
 
 export function formatUptime(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
-    return "데이터 없음";
+    return "측정 데이터 없음";
   }
 
   const rounded = roundPercent(value);
@@ -249,10 +249,12 @@ export function toStatusViewModel(
   const hasNoData = components.length === 0 || components.every(({ status }) => status === "unknown") &&
     response.components.every(isNoData);
   let computedOverall: PublicStatusResponse["overall"] = response.overall;
-  if (isStale || hasNoData || components.some(({ status }) => status === "unknown")) {
+  if (isStale || hasNoData) {
     computedOverall = "verification_unavailable";
   } else if (components.some(({ status }) => status === "outage")) {
     computedOverall = "service_disruption";
+  } else if (components.some(({ status }) => status === "unknown")) {
+    computedOverall = "verification_unavailable";
   }
 
   const incidents = sortIncidents(content.incidents ?? []);

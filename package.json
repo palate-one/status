@@ -5,9 +5,9 @@
   "scripts": {
     "check": "astro check && tsc -p tsconfig.worker.json --noEmit",
     "test": "vitest run",
-    "build": "astro build",
+    "build": "astro build --force",
     "cf:typecheck": "wrangler types && tsc -p tsconfig.worker.json --noEmit",
-    "cf:build": "astro build && wrangler deploy --dry-run --outdir .wrangler-dist",
+    "cf:build": "astro build --force && wrangler deploy --dry-run --outdir .wrangler-dist",
     "dev": "wrangler dev"
   },
   "devDependencies": {
