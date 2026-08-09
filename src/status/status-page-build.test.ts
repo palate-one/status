@@ -4,6 +4,32 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+function cssToken(css: string, name: string): string {
+  const value = css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
+  if (!value) throw new Error(`Missing CSS token: --${name}`);
+  return value;
+}
+
+function relativeLuminance(hex: string): number {
+  const channels = hex
+    .slice(1)
+    .match(/../g)
+    ?.map((channel) => Number.parseInt(channel, 16) / 255);
+  if (!channels || channels.length !== 3) throw new Error(`Invalid color: ${hex}`);
+  const linear = channels.map((channel) =>
+    channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 describe("status page build", () => {
   it("builds one integrated service status section with two 30-day placeholder rails", async () => {
     execFileSync("bun", ["run", "build"], {
@@ -61,6 +87,34 @@ describe("status page build", () => {
     expect(outageRule).toContain("border-color: var(--red);");
     expect(outageRule).toContain("background: var(--red);");
     expect(css).not.toMatch(/\.uptime-day\.has-down::after\s*\{/);
+  });
+
+  it("keeps the unknown neutral foreground above WCAG AA contrast", async () => {
+    const css = await readFile("src/styles/global.css", "utf8");
+    const ratio = contrastRatio(cssToken(css, "unknown"), cssToken(css, "unknown-soft"));
+
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("explains the non-color uptime cue without pointer-only wording", async () => {
+    const [css, uptimeBars, statusClient] = await Promise.all([
+      readFile("src/styles/global.css", "utf8"),
+      readFile("src/components/UptimeBars.astro", "utf8"),
+      readFile("src/scripts/status-client.ts", "utf8"),
+    ]);
+    const dayRule = css.match(/\.uptime-day\s*\{([^}]*)\}/)?.[1] ?? "";
+    const downMarkRule = css.match(/\.uptime-day\.has-down \.day-mark\s*\{([^}]*)\}/)?.[1] ?? "";
+    const note = uptimeBars.match(/<p class="uptime-note">([^<]*)<\/p>/)?.[1] ?? "";
+
+    expect(dayRule).toContain("position: relative;");
+    expect(downMarkRule).toContain("display: grid;");
+    expect(downMarkRule).toContain("clip: auto;");
+    expect(downMarkRule).toContain("color: var(--canvas);");
+    expect(note).toContain("흰색 !");
+    expect(note).not.toContain("마우스");
+    expect(uptimeBars).toContain('day.downSamples > 0 ? "!"');
+    expect(statusClient).toContain('day.downSamples > 0 ? "!"');
+    expect(css).not.toContain(".history-section");
   });
 
   it("renders resolved history as one KST date group in completion order", async () => {

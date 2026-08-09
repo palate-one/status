@@ -315,4 +315,43 @@ describe("status view model", () => {
       "inc-2026-08-08-kst-history",
     ]);
   });
+
+  it("groups multiple KST dates newest first and falls back for cancelled maintenance", () => {
+    const incidents = [
+      {
+        data: {
+          id: "inc-2026-08-10-kst-groups",
+          status: "resolved",
+          startedAt: "2026-08-09T23:30:00Z",
+          resolvedAt: "2026-08-10T00:30:00Z",
+        },
+      },
+      {
+        data: {
+          id: "inc-2026-08-08-kst-groups",
+          status: "resolved",
+          startedAt: "2026-08-08T14:00:00Z",
+          resolvedAt: "2026-08-08T15:00:00Z",
+        },
+      },
+    ] as const;
+    const maintenance = [
+      {
+        data: {
+          id: "maint-2026-08-09-kst-cancelled",
+          status: "cancelled",
+          startsAt: "2026-08-09T01:00:00Z",
+          endsAt: null,
+        },
+      },
+    ] as const;
+
+    const groups = groupResolvedHistory(incidents, maintenance);
+
+    expect(groups.map(({ date }) => date)).toEqual(["2026-08-10", "2026-08-09"]);
+    expect(groups[1]?.entries.map(({ entry }) => entry.data.id)).toEqual([
+      "maint-2026-08-09-kst-cancelled",
+      "inc-2026-08-08-kst-groups",
+    ]);
+  });
 });

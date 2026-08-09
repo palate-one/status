@@ -240,6 +240,40 @@ describe("uptime rail hydration", () => {
       expect(placeholders.every((day) => day.getAttribute("aria-hidden") === "true")).toBe(true);
     }
   });
+
+  it("keeps the visible outage cue in hydrated day markup", () => {
+    const { root } = createRoot();
+    const base = response();
+    const outageResponse: PublicStatusResponse = {
+      ...base,
+      components: base.components.map((component) =>
+        component.id === "web"
+          ? {
+              ...component,
+              days: [
+                {
+                  day: "2026-08-09",
+                  upSamples: 0,
+                  downSamples: 1,
+                  expectedSamples: 1,
+                  uptimePercent: 0,
+                  coveragePercent: 100,
+                },
+              ],
+            }
+          : component,
+      ),
+    };
+
+    renderStatusModel(
+      root as unknown as ParentNode,
+      toStatusViewModel(outageResponse, new Date("2026-08-09T12:20:00Z")),
+    );
+
+    const webList = root.querySelector('[data-uptime-component="web"] [data-uptime-list]');
+    const outageDay = webList?.children.find((day) => day.className.split(" ").includes("has-down"));
+    expect(outageDay?.querySelector(".day-mark")?.textContent).toBe("!");
+  });
 });
 
 describe("long-lived status tabs", () => {
