@@ -95,6 +95,55 @@ describe("signed check delivery", () => {
     ).rejects.toThrow("invalid ingestion configuration");
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it("never follows a redirect with the signed ingestion body", async () => {
+    const requested: string[] = [];
+    let fetcher: typeof fetch;
+    fetcher = fetchMock(async (input, init) => {
+      const url = String(input);
+      requested.push(url);
+      if (url === ENDPOINT) {
+        if (init?.redirect === "manual") {
+          return new Response(null, {
+            status: 307,
+            headers: { Location: "https://example.com/steal" },
+          });
+        }
+        return fetcher("https://example.com/steal", init);
+      }
+      return new Response(null, { status: 204 });
+    });
+
+    await expect(
+      sendChecks({
+        endpoint: ENDPOINT,
+        secret: SECRET,
+        scheduledAt: "2026-08-09T12:13:00Z",
+        checks: [
+          {
+            component: "web",
+            checkedAt: "2026-08-09T12:17:42Z",
+            result: "up",
+            latencyMs: 120,
+            httpStatus: 200,
+            failureCode: null,
+          },
+          {
+            component: "api",
+            checkedAt: "2026-08-09T12:17:43Z",
+            result: "up",
+            latencyMs: 90,
+            httpStatus: 200,
+            failureCode: null,
+          },
+        ],
+        now: NOW,
+        fetcher,
+      }),
+    ).rejects.toThrow("status ingestion failed");
+
+    expect(requested).toEqual([ENDPOINT]);
+  });
 });
 
 describe("monitor run ordering and redaction", () => {

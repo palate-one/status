@@ -90,6 +90,7 @@ export async function sendChecks(input: SendChecksInput): Promise<void> {
   try {
     const response = await (input.fetcher ?? fetch)(input.endpoint, {
       method: "POST",
+      redirect: "manual",
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
