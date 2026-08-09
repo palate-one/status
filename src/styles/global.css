@@ -95,7 +95,7 @@ a {
 
 .brand {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   min-height: 44px;
   padding-block: 10px;
   color: var(--text);
@@ -106,17 +106,11 @@ a {
 
 .brand-logo {
   display: block;
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-}
-
-.brand span {
-  margin-left: 6px;
-  color: var(--coral);
-  font-size: 14px;
-  font-weight: 600;
+  flex: 0 0 72px;
+  width: 72px;
+  height: 24px;
+  object-fit: cover;
+  object-position: center;
 }
 
 .site-header p,
@@ -381,22 +375,13 @@ h4 {
 
 .uptime-day.has-down {
   border-color: var(--red);
-  background: var(--red-soft);
+  background: var(--red);
 }
 
 .uptime-day.is-empty,
 .uptime-day.is-placeholder {
   border-color: var(--unknown);
   background: var(--unknown-soft);
-}
-
-.uptime-day.has-down::after {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--red);
-  content: "";
 }
 
 .day-mark {
