@@ -62,7 +62,7 @@ async function signedRequest(
   const timestamp = init.timestamp ?? TIMESTAMP;
   const signature = init.signature ?? (await signBody(SECRET, timestamp, rawBody));
 
-  return new Request("https://status.palate.one/api/ingest", {
+  return new Request("https://status.palate.one/api/checks", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -84,7 +84,7 @@ async function fetchWith(store: StatusStore, request: Request): Promise<Response
 describe("status ingestion handler", () => {
   it("returns 415 without reading a non-JSON request", async () => {
     const store = createStore();
-    const request = new Request("https://status.palate.one/api/ingest", {
+    const request = new Request("https://status.palate.one/api/checks", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: "sensitive raw body",

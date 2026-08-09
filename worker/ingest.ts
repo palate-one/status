@@ -233,7 +233,7 @@ export function createWorker(options: WorkerOptions = {}): ExportedHandler<Env> 
   return {
     async fetch(request, env): Promise<Response> {
       const url = new URL(request.url);
-      if (url.pathname !== "/api/ingest") {
+      if (url.pathname !== "/api/checks") {
         return env.ASSETS.fetch(request);
       }
       if (request.method !== "POST") {
