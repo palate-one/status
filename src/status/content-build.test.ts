@@ -1,17 +1,18 @@
 import { execFileSync } from "node:child_process";
-import { rm, writeFile } from "node:fs/promises";
+import { lstat, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const mismatchedPath = join(process.cwd(), "content/uptime/2026-W33.json");
+// Year 9999 is reserved for this non-production build fixture.
+const mismatchedPath = join(process.cwd(), "content/uptime/9999-W02.json");
 const mismatchedDocument = {
   schemaVersion: 1,
-  week: "2026-W32",
-  from: "2026-08-03T00:00:00Z",
-  to: "2026-08-10T00:00:00Z",
-  generatedAt: "2026-08-10T00:05:00Z",
-  monitoringStartedAt: "2026-08-01T00:00:00Z",
+  week: "9999-W01",
+  from: "9999-01-04T00:00:00Z",
+  to: "9999-01-11T00:00:00Z",
+  generatedAt: "9999-01-11T00:05:00Z",
+  monitoringStartedAt: "9999-01-01T00:00:00Z",
   components: [
     {
       id: "web",
@@ -26,9 +27,24 @@ const mismatchedDocument = {
 
 describe("weekly uptime content build validation", () => {
   it("rejects a real uptime file whose filename week differs from its document week", async () => {
-    await writeFile(mismatchedPath, `${JSON.stringify(mismatchedDocument)}\n`, "utf8");
+    try {
+      await lstat(mismatchedPath);
+      throw new Error(`Reserved test fixture already exists: ${mismatchedPath}`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+
+    let createdByThisTest = false;
 
     try {
+      await writeFile(mismatchedPath, `${JSON.stringify(mismatchedDocument)}\n`, {
+        encoding: "utf8",
+        flag: "wx",
+      });
+      createdByThisTest = true;
+
       let output = "";
       let failed = false;
       try {
@@ -46,10 +62,12 @@ describe("weekly uptime content build validation", () => {
       }
 
       expect(failed).toBe(true);
-      expect(output).toContain("2026-W33.json");
+      expect(output).toContain("9999-W02.json");
       expect(output).toMatch(/week|filename/i);
     } finally {
-      await rm(mismatchedPath, { force: true });
+      if (createdByThisTest) {
+        await rm(mismatchedPath);
+      }
     }
   });
 });
