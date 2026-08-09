@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -242,6 +242,23 @@ describe("public endpoint and archive safety", () => {
       expect(await readdir(join(root, "content/uptime"))).toEqual(["2026-W32.json"]);
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a symlinked archive directory without writing outside the root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "palate-weekly-root-"));
+    const outside = await mkdtemp(join(tmpdir(), "palate-weekly-outside-"));
+    try {
+      await mkdir(join(root, "content"));
+      await symlink(outside, join(root, "content/uptime"), "dir");
+
+      await expect(
+        writeWeeklyArchive(buildWeeklyDocument(statusResponse(), RANGE), root),
+      ).rejects.toThrow(/archive directory/i);
+      expect(await readdir(outside)).toEqual([]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
     }
   });
 

@@ -24,8 +24,13 @@ export type PublishWeeklyOptions = {
 
 type DailyUptimePoint = PublicStatusResponse["components"][number]["days"][number];
 type PublicComponent = PublicStatusResponse["components"][number];
+type FileStat = {
+  isDirectory(): boolean;
+  isSymbolicLink(): boolean;
+};
 type FsPromises = {
   link(oldPath: string, newPath: string): Promise<void>;
+  lstat(path: string): Promise<FileStat>;
   mkdir(path: string, options: { recursive: boolean }): Promise<string | undefined>;
   unlink(path: string): Promise<void>;
   writeFile(
@@ -388,6 +393,13 @@ function serializedDocument(document: WeeklyUptimeDocument): string {
   return `${JSON.stringify(document, null, 2)}\n`;
 }
 
+async function assertArchiveDirectory(fs: FsPromises, path: string): Promise<void> {
+  const stat = await fs.lstat(path);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error("archive directory must be a real directory inside the root");
+  }
+}
+
 export async function writeWeeklyArchive(
   document: WeeklyUptimeDocument,
   root = currentWorkingDirectory(),
@@ -403,7 +415,12 @@ export async function writeWeeklyArchive(
   const fs = await fsPromises();
   const target = joinPath(root, relativePath);
   const directory = target.slice(0, target.lastIndexOf("/"));
+  const contentDirectory = joinPath(root, "content");
+  await assertArchiveDirectory(fs, root);
+  await fs.mkdir(contentDirectory, { recursive: true });
+  await assertArchiveDirectory(fs, contentDirectory);
   await fs.mkdir(directory, { recursive: true });
+  await assertArchiveDirectory(fs, directory);
 
   const temporary = `${directory}/.${document.week}.${randomIdentifier()}.tmp`;
   const contents = serializedDocument(document);
