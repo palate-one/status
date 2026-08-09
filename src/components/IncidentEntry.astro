@@ -1,0 +1,53 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+
+interface Props {
+  entry: CollectionEntry<"incidents">;
+  headingLevel: "h3" | "h4";
+}
+
+const { entry, headingLevel } = Astro.props;
+const { Content } = await render(entry);
+
+const incidentStatusLabel = {
+  investigating: "조사 중",
+  identified: "원인 확인됨",
+  monitoring: "복구 확인 중",
+  resolved: "해결됨",
+} as const;
+const severityLabel = {
+  degraded: "성능 저하",
+  partial_outage: "부분 장애",
+  major_outage: "주요 장애",
+} as const;
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+---
+
+<article class="timeline-entry" data-incident-id={entry.data.id}>
+  <header class="timeline-entry-heading">
+    <div class="entry-tags">
+      <span class="entry-tag">{severityLabel[entry.data.severity]}</span>
+      <span class="entry-status">{incidentStatusLabel[entry.data.status]}</span>
+    </div>
+    <time datetime={entry.data.startedAt}>{formatDate(entry.data.startedAt)}</time>
+  </header>
+  {headingLevel === "h3" ? (
+    <h3 id={`${entry.data.id}-heading`}>{entry.data.title}</h3>
+  ) : (
+    <h4 id={`${entry.data.id}-heading`}>{entry.data.title}</h4>
+  )}
+  <p class="entry-components">영향 범위 · {entry.data.components.map((component) => component.toUpperCase()).join(", ")}</p>
+  <div class="entry-body"><Content /></div>
+  {entry.data.resolvedAt ? (
+    <p class="entry-resolution"><time datetime={entry.data.resolvedAt}>해결 · {formatDate(entry.data.resolvedAt)}</time></p>
+  ) : null}
+</article>

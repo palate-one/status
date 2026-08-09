@@ -1,0 +1,48 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+
+interface Props {
+  entry: CollectionEntry<"maintenance">;
+  headingLevel: "h3" | "h4";
+}
+
+const { entry, headingLevel } = Astro.props;
+const { Content } = await render(entry);
+
+const maintenanceStatusLabel = {
+  scheduled: "예정",
+  in_progress: "진행 중",
+  completed: "완료",
+  cancelled: "취소됨",
+} as const;
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+---
+
+<article class="timeline-entry" data-maintenance-id={entry.data.id}>
+  <header class="timeline-entry-heading">
+    <div class="entry-tags">
+      <span class="entry-tag">{maintenanceStatusLabel[entry.data.status]}</span>
+    </div>
+    <time datetime={entry.data.startsAt}>{formatDate(entry.data.startsAt)}</time>
+  </header>
+  {headingLevel === "h3" ? (
+    <h3 id={`${entry.data.id}-heading`}>{entry.data.title}</h3>
+  ) : (
+    <h4 id={`${entry.data.id}-heading`}>{entry.data.title}</h4>
+  )}
+  <p class="entry-components">영향 범위 · {entry.data.components.map((component) => component.toUpperCase()).join(", ")}</p>
+  <dl class="maintenance-time">
+    <div><dt>시작</dt><dd><time datetime={entry.data.startsAt}>{formatDate(entry.data.startsAt)}</time></dd></div>
+    {entry.data.endsAt ? <div><dt>종료</dt><dd><time datetime={entry.data.endsAt}>{formatDate(entry.data.endsAt)}</time></dd></div> : null}
+  </dl>
+  <div class="entry-body"><Content /></div>
+</article>

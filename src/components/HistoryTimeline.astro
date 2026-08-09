@@ -1,0 +1,55 @@
+---
+import { type CollectionEntry } from "astro:content";
+
+import { groupResolvedHistory } from "../status/view-model";
+import IncidentEntry from "./IncidentEntry.astro";
+import MaintenanceEntry from "./MaintenanceEntry.astro";
+
+interface Props {
+  incidents: readonly CollectionEntry<"incidents">[];
+  maintenance: readonly CollectionEntry<"maintenance">[];
+}
+
+const { incidents, maintenance } = Astro.props;
+const groups = groupResolvedHistory(incidents, maintenance);
+
+function formatDate(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(date);
+}
+---
+
+<section class="status-section history-timeline" aria-labelledby="history-heading">
+  <div class="section-heading">
+    <p class="eyebrow">지난 기록</p>
+    <h2 id="history-heading">지난 운영 기록</h2>
+  </div>
+  {groups.length === 0 ? (
+    <p class="empty-state">지난 운영 기록이 없어요.</p>
+  ) : (
+    <div class="history-groups">
+      {groups.map((group) => (
+        <section class="history-group" aria-labelledby={`history-date-${group.date}`}>
+          <h3 id={`history-date-${group.date}`} data-history-date={group.date}>
+            <time datetime={group.date}>{formatDate(group.date)}</time>
+          </h3>
+          <div class="timeline-list">
+            {group.entries.map((item) =>
+              item.kind === "incident" ? (
+                <IncidentEntry entry={item.entry} headingLevel="h4" />
+              ) : (
+                <MaintenanceEntry entry={item.entry} headingLevel="h4" />
+              ),
+            )}
+          </div>
+        </section>
+      ))}
+    </div>
+  )}
+</section>
