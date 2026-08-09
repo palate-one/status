@@ -258,6 +258,28 @@ describe("public status routing", () => {
     expect(store.readStatus).not.toHaveBeenCalled();
   });
 
+  it("fails closed before D1 when the rate-limit binding rejects", async () => {
+    const store = createStore();
+    const env = createEnv();
+    vi.mocked(env.STATUS_READ_LIMITER.limit).mockRejectedValue(
+      new Error("private rate-limit diagnostic"),
+    );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const { response } = await fetchStatus(
+      new Request("https://status.palate.one/api/status"),
+      store,
+      env,
+    );
+    const logs = errorSpy.mock.calls.flat().join(" ");
+    errorSpy.mockRestore();
+
+    expect(response.status).toBe(503);
+    expect(store.readStatus).not.toHaveBeenCalled();
+    expect(logs).toBe("public status rate limit failed");
+    expect(logs).not.toContain("private rate-limit diagnostic");
+  });
+
   it("returns generic 503 without leaking a D1 error", async () => {
     const sensitive = "private D1 diagnostic";
     const store = createStore({

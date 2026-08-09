@@ -26,9 +26,6 @@ async function resetDatabase(): Promise<void> {
   await env.TEST_DB.batch([
     env.TEST_DB.prepare("DELETE FROM check_samples"),
     env.TEST_DB.prepare("DELETE FROM daily_uptime"),
-    env.TEST_DB.prepare(
-      "UPDATE status_metadata SET monitoring_started_at = NULL WHERE id = 1",
-    ),
     env.TEST_DB.prepare(`
       UPDATE component_state
       SET status = 'unknown',
@@ -36,6 +33,24 @@ async function resetDatabase(): Promise<void> {
           last_checked_at = NULL,
           last_success_at = NULL,
           last_failure_at = NULL
+    `),
+    env.TEST_DB.prepare(`
+      UPDATE status_metadata
+      SET monitoring_started_at = NULL,
+          latest_day = NULL,
+          states_json = (
+            SELECT json_group_array(json_object(
+              'component', component,
+              'status', status,
+              'consecutive_failures', consecutive_failures,
+              'last_checked_at', last_checked_at,
+              'last_success_at', last_success_at,
+              'last_failure_at', last_failure_at
+            ))
+            FROM (SELECT * FROM component_state ORDER BY component)
+          ),
+          daily_json = '[]'
+      WHERE id = 1
     `),
   ]);
 }
@@ -229,6 +244,49 @@ describe("D1 status store", () => {
     expect(metadata?.monitoring_started_at).toBe("2026-06-01T00:03:00Z");
   });
 
+  it("serves public state from one materialized metadata row", async () => {
+    await store.insertSamples([sample("web", "2026-08-09T00:03:00Z", "up")]);
+    await env.TEST_DB.batch([
+      env.TEST_DB.prepare("DELETE FROM daily_uptime"),
+      env.TEST_DB.prepare(`
+        UPDATE component_state
+        SET status = 'unknown',
+            consecutive_failures = 0,
+            last_checked_at = NULL,
+            last_success_at = NULL,
+            last_failure_at = NULL
+      `),
+    ]);
+
+    const result = await store.readStatus(new Date("2026-08-09T12:00:00Z"));
+
+    expect(result.states.find(({ component }) => component === "web")).toMatchObject({
+      status: "operational",
+      lastCheckedAt: "2026-08-09T00:03:00Z",
+    });
+    expect(result.daily).toEqual([
+      expect.objectContaining({ component: "web", day: "2026-08-09", upSamples: 1 }),
+    ]);
+  });
+
+  it("uses the checked-at retention index without a full scan or sort", async () => {
+    const plan = await env.TEST_DB.prepare(`
+      EXPLAIN QUERY PLAN
+      SELECT id
+      FROM check_samples
+      WHERE checked_at < ?1
+      ORDER BY checked_at, id
+      LIMIT ?2
+    `)
+      .bind("2026-08-01T00:00:00Z", 1_000)
+      .all<{ detail: string }>();
+    const details = plan.results.map(({ detail }) => detail).join("\n");
+
+    expect(details).toContain("check_samples_checked_at_id_idx");
+    expect(details).not.toContain("SCAN check_samples");
+    expect(details).not.toContain("TEMP B-TREE");
+  });
+
   it("rolls back the whole envelope when one sample fails", async () => {
     await expect(
       store.insertSamples([
@@ -249,6 +307,7 @@ describe("D1 status store", () => {
 
     expect(samples?.count).toBe(0);
     expect(aggregates?.count).toBe(0);
+    expect(snapshot.monitoringStartedAt).toBeNull();
     expect(snapshot.states).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ component: "web", status: "unknown" }),

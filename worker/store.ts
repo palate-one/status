@@ -48,6 +48,8 @@ type DailyRow = {
 
 type MonitoringRow = {
   monitoring_started_at: string | null;
+  states_json: string;
+  daily_json: string;
 };
 
 function assertValidDate(name: string, value: Date): string {
@@ -95,6 +97,14 @@ function mapDaily(row: DailyRow): DailyAggregateRow {
   };
 }
 
+function parseStoredRows<T>(value: string): T[] {
+  const parsed: unknown = JSON.parse(value);
+  if (!Array.isArray(parsed)) {
+    throw new TypeError("materialized status rows must be an array");
+  }
+  return parsed as T[];
+}
+
 export function createD1StatusStore(db: D1Database): StatusStore {
   return {
     async insertSamples(samples: readonly CheckSample[]): Promise<{ inserted: number }> {
@@ -116,21 +126,65 @@ export function createD1StatusStore(db: D1Database): StatusStore {
         RETURNING id
       `);
       const results = await db.batch(
-        samples.map((sample) =>
-          statement.bind(
-            sample.component,
-            sample.scheduledAt,
-            sample.checkedAt,
-            sample.result,
-            sample.latencyMs,
-            sample.httpStatus,
-            sample.failureCode,
+        [
+          ...samples.map((sample) =>
+            statement.bind(
+              sample.component,
+              sample.scheduledAt,
+              sample.checkedAt,
+              sample.result,
+              sample.latencyMs,
+              sample.httpStatus,
+              sample.failureCode,
+            ),
           ),
-        ),
+          db.prepare(`
+            UPDATE status_metadata
+            SET
+              states_json = (
+                SELECT json_group_array(json_object(
+                  'component', component,
+                  'status', status,
+                  'consecutive_failures', consecutive_failures,
+                  'last_checked_at', last_checked_at,
+                  'last_success_at', last_success_at,
+                  'last_failure_at', last_failure_at
+                ))
+                FROM (
+                  SELECT *
+                  FROM component_state
+                  ORDER BY component
+                )
+              ),
+              daily_json = (
+                SELECT json_group_array(json_object(
+                  'day', day,
+                  'component', component,
+                  'up_samples', up_samples,
+                  'down_samples', down_samples,
+                  'expected_samples', expected_samples,
+                  'first_scheduled_at', first_scheduled_at,
+                  'last_scheduled_at', last_scheduled_at
+                ))
+                FROM (
+                  SELECT *
+                  FROM daily_uptime
+                  WHERE day BETWEEN date(
+                    (SELECT latest_day FROM status_metadata WHERE id = 1),
+                    '-34 days'
+                  ) AND (SELECT latest_day FROM status_metadata WHERE id = 1)
+                  ORDER BY day, component
+                )
+              )
+            WHERE id = 1
+          `),
+        ],
       );
 
       return {
-        inserted: results.reduce((total, result) => total + result.results.length, 0),
+        inserted: results
+          .slice(0, samples.length)
+          .reduce((total, result) => total + result.results.length, 0),
       };
     },
 
@@ -138,43 +192,24 @@ export function createD1StatusStore(db: D1Database): StatusStore {
       const nowIso = assertValidDate("now", now);
       const { startDay, endDay } = statusWindow(nowIso);
 
-      const [stateResult, dailyResult, monitoringResult] = await db.batch([
-        db.prepare(`
-          SELECT
-            component,
-            status,
-            consecutive_failures,
-            last_checked_at,
-            last_success_at,
-            last_failure_at
-          FROM component_state
-          ORDER BY component
-        `),
-        db.prepare(`
-          SELECT
-            day,
-            component,
-            up_samples,
-            down_samples,
-            expected_samples,
-            first_scheduled_at,
-            last_scheduled_at
-          FROM daily_uptime
-          WHERE day BETWEEN ?1 AND ?2
-          ORDER BY day, component
-        `).bind(startDay, endDay),
-        db.prepare(`
-          SELECT monitoring_started_at
+      const monitoring = await db
+        .prepare(`
+          SELECT monitoring_started_at, states_json, daily_json
           FROM status_metadata
           WHERE id = 1
-        `),
-      ]);
+        `)
+        .first<MonitoringRow>();
+      if (monitoring === null) {
+        throw new Error("status metadata is unavailable");
+      }
+      const dailyRows = parseStoredRows<DailyRow>(monitoring.daily_json).filter(
+        ({ day }) => day >= startDay && day <= endDay,
+      );
 
-      const monitoring = monitoringResult.results[0] as MonitoringRow | undefined;
       return {
-        monitoringStartedAt: monitoring?.monitoring_started_at ?? null,
-        states: (stateResult.results as StateRow[]).map(mapState),
-        daily: (dailyResult.results as DailyRow[]).map(mapDaily),
+        monitoringStartedAt: monitoring.monitoring_started_at,
+        states: parseStoredRows<StateRow>(monitoring.states_json).map(mapState),
+        daily: dailyRows.map(mapDaily),
       };
     },
 
