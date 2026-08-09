@@ -30,6 +30,21 @@ export type ComponentStatusViewModel = {
   days: DailyUptimeViewModel[];
 };
 
+export type ResolvedHistoryItem<
+  I extends IncidentEntry = StatusContentEntry<IncidentFrontmatter>,
+  M extends MaintenanceEntry = StatusContentEntry<MaintenanceFrontmatter>,
+> =
+  | { kind: "incident"; entry: I; timestamp: string }
+  | { kind: "maintenance"; entry: M; timestamp: string };
+
+export type ResolvedHistoryGroup<
+  I extends IncidentEntry = StatusContentEntry<IncidentFrontmatter>,
+  M extends MaintenanceEntry = StatusContentEntry<MaintenanceFrontmatter>,
+> = {
+  date: string;
+  entries: Array<ResolvedHistoryItem<I, M>>;
+};
+
 export type StatusViewModel = {
   overallStatus: PublicStatusResponse["overall"];
   overallLabel: "모든 시스템 정상" | "서비스 문제 발생" | "상태 확인 불가";
@@ -40,10 +55,7 @@ export type StatusViewModel = {
   scheduledMaintenance: StatusContentEntry<MaintenanceFrontmatter>[];
   incidentHistory: StatusContentEntry<IncidentFrontmatter>[];
   maintenanceHistory: StatusContentEntry<MaintenanceFrontmatter>[];
-  resolvedHistory: Array<
-    | StatusContentEntry<IncidentFrontmatter>
-    | StatusContentEntry<MaintenanceFrontmatter>
-  >;
+  resolvedHistory: ResolvedHistoryGroup[];
 };
 
 export type StatusContent = {
@@ -155,6 +167,62 @@ function sortHistory<T>(
   read: (entry: T) => string | null | undefined,
 ): T[] {
   return sortByTimestamp(entries, read);
+}
+
+function kstDateKey(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return "날짜 확인 불가";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((candidate) => candidate.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function groupResolvedHistory<
+  I extends IncidentEntry,
+  M extends MaintenanceEntry,
+>(
+  incidents: readonly I[],
+  maintenance: readonly M[],
+): ResolvedHistoryGroup<I, M>[] {
+  const items: Array<ResolvedHistoryItem<I, M>> = [
+    ...incidents
+      .filter(({ data }) => data.status === "resolved")
+      .map((entry) => ({
+        kind: "incident" as const,
+        entry,
+        timestamp: entry.data.resolvedAt ?? entry.data.startedAt,
+      })),
+    ...maintenance
+      .filter(({ data }) => data.status === "completed" || data.status === "cancelled")
+      .map((entry) => ({
+        kind: "maintenance" as const,
+        entry,
+        timestamp: entry.data.endsAt ?? entry.data.startsAt,
+      })),
+  ];
+  const orderedItems = sortByTimestamp(items, ({ timestamp }) => timestamp);
+  const groups = new Map<string, Array<ResolvedHistoryItem<I, M>>>();
+
+  for (const item of orderedItems) {
+    const date = kstDateKey(item.timestamp);
+    const group = groups.get(date);
+    if (group) {
+      group.push(item);
+    } else {
+      groups.set(date, [item]);
+    }
+  }
+
+  return [...groups].map(([date, entries]) => ({ date, entries }));
 }
 
 function formatDateTime(value: string | null): string {
@@ -318,6 +386,6 @@ export function toStatusViewModel(
     scheduledMaintenance,
     incidentHistory,
     maintenanceHistory,
-    resolvedHistory: [...incidentHistory, ...maintenanceHistory],
+    resolvedHistory: groupResolvedHistory(incidents, maintenance),
   };
 }

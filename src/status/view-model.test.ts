@@ -4,6 +4,7 @@ import type { PublicStatusResponse } from "../../worker/read";
 import {
   buildThirtyDayUptimeRail,
   formatUptime,
+  groupResolvedHistory,
   sortIncidentHistory,
   sortIncidents,
   sortMaintenanceHistory,
@@ -276,6 +277,42 @@ describe("status view model", () => {
     expect(sortMaintenanceHistory(maintenance).map(({ data }) => data.id)).toEqual([
       "maint-new",
       "maint-old",
+    ]);
+  });
+
+  it("groups resolved history by KST completion date and keeps newest completion first", () => {
+    const incidents = [
+      {
+        data: {
+          id: "inc-2026-08-08-kst-history",
+          status: "resolved",
+          startedAt: "2026-08-08T23:00:00Z",
+          resolvedAt: "2026-08-09T00:30:00Z",
+        },
+      },
+    ] as const;
+    const maintenance = [
+      {
+        data: {
+          id: "maint-2026-08-08-kst-history",
+          status: "completed",
+          startsAt: "2026-08-08T23:30:00Z",
+          endsAt: "2026-08-09T01:00:00Z",
+        },
+      },
+    ] as const;
+
+    const groups = groupResolvedHistory(incidents, maintenance);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.date).toBe("2026-08-09");
+    expect(groups[0]?.entries.map(({ kind }) => kind)).toEqual([
+      "maintenance",
+      "incident",
+    ]);
+    expect(groups[0]?.entries.map(({ entry }) => entry.data.id)).toEqual([
+      "maint-2026-08-08-kst-history",
+      "inc-2026-08-08-kst-history",
     ]);
   });
 });

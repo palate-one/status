@@ -2,6 +2,7 @@
 import { getCollection } from "astro:content";
 
 import ComponentStatus from "../components/ComponentStatus.astro";
+import HistoryTimeline from "../components/HistoryTimeline.astro";
 import IncidentList from "../components/IncidentList.astro";
 import MaintenanceList from "../components/MaintenanceList.astro";
 import OverallStatus from "../components/OverallStatus.astro";
@@ -63,14 +64,7 @@ const initialComponents: ComponentStatusViewModel[] = [
 
       <IncidentList entries={incidents} mode="active" />
       <MaintenanceList entries={maintenance} mode="upcoming" />
-      <section class="history-section" aria-labelledby="history-heading">
-        <div class="section-heading">
-          <p class="eyebrow">지난 기록</p>
-          <h2 id="history-heading">종료·완료 이력</h2>
-        </div>
-        <IncidentList entries={incidents} mode="history" />
-        <MaintenanceList entries={maintenance} mode="history" />
-      </section>
+      <HistoryTimeline incidents={incidents} maintenance={maintenance} />
 
       <footer class="site-footer">
         <p>이 페이지는 공개 Web 응답과 API readiness 관측만 보여줘요. 모든 사용자 흐름의 정상 동작을 뜻하지 않아요.</p>
