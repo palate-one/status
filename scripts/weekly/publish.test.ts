@@ -299,6 +299,11 @@ describe("public endpoint and archive safety", () => {
     expect(workflow).toContain(
       'git config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
     );
+    expect(workflow).toContain('-m "CHORE: 주간 가동률 $week 공개"');
+    expect(workflow).toContain("- 어떤 작업을 했는가:");
+    expect(workflow).toContain("- 어떤 이슈인가:");
+    expect(workflow).toContain("- 그래서 무엇을 했는가:");
+    expect(workflow).not.toContain("chore(uptime):");
     expect(workflow).toContain('git push origin "HEAD:refs/heads/$branch"');
     expect(workflow).toContain("compare/main...$branch?expand=1");
     expect(workflow).not.toContain("gh pr create");

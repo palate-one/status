@@ -67,7 +67,11 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore(uptime): publish $week"
+          git commit \
+            -m "CHORE: 주간 가동률 $week 공개" \
+            -m "- 어떤 작업을 했는가: $week 공개 가동률 archive 생성
+          - 어떤 이슈인가: 주간 상태 이력 공개
+          - 그래서 무엇을 했는가: 검증된 status projection을 한 개 JSON으로 기록"
           gh auth setup-git
           git push origin "HEAD:refs/heads/$branch"
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"

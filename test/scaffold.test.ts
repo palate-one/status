@@ -8,4 +8,5 @@ describe("status repository", () => {
       "astro build --force && wrangler deploy --dry-run --outdir .wrangler-dist",
     );
   });
+
 });

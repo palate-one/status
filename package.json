@@ -3,6 +3,12 @@
   "private": false,
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "conventions:test": "bun test scripts/conventions.test.mjs",
+    "conventions:commits": "bun scripts/validate-commit-messages.mjs",
+    "conventions:commit-msg": "bun scripts/validate-commit-message.mjs",
+    "conventions:pr-body": "bun scripts/validate-pr-body.mjs",
     "check": "astro check && tsc -p tsconfig.worker.json --noEmit",
     "test": "vitest run",
     "build": "astro build --force",

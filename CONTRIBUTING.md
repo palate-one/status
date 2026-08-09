@@ -48,4 +48,18 @@ bun run cf:build
 git diff --check
 ```
 
+## Commit과 pull request
+
+Palate 저장소와 같은 convention을 사용한다. commit 제목은 허용된 대문자 type과 한국어 요약을 사용하고 본문 세 항목을 모두 적는다.
+
+```text
+CHORE: production D1 연결
+
+- 어떤 작업을 했는가: 공개 상태 Worker의 D1 binding 연결
+- 어떤 이슈인가: production 배포 준비
+- 그래서 무엇을 했는가: 실제 D1 식별자와 공개 설정 회귀 검증 추가
+```
+
+PR은 한국어로 작성하고 repository template의 8개 heading을 모두 유지한다. validation, known issue, trade-off와 next step을 숨기지 않는다.
+
 commit 전 `git status --short`, staged file 목록, `git diff --cached --check`를 확인한다. 혼합 worktree에서 `git add -A`를 사용하지 않는다.

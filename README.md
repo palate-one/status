@@ -83,7 +83,7 @@ bun run cf:build
 git diff --check
 ```
 
-`bun run cf:build`는 dry run이다. `wrangler.jsonc`의 all-zero D1 ID는 로컬 전용 sentinel이라 실제 배포 준비가 아니다. 실제 D1 ID, secret, custom domain, Workers Builds 연결은 별도 운영 단계에서 검증한다.
+`bun run cf:build`는 dry run이다. `wrangler.jsonc`에는 공개 가능한 production D1 식별자만 있으며 credential이나 secret은 없다. Worker와 GitHub의 `STATUS_INGEST_SECRET`, custom domain, Workers Builds 연결은 별도 운영 단계에서 검증한다.
 
 ## 무료 운영 경계
 
