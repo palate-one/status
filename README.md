@@ -9,7 +9,7 @@ GitHub Actions monitor (5분)
   -> Web / API 공개 health 확인
   -> HMAC 서명 POST /api/checks
   -> Cloudflare Worker
-  -> atomic D1 sample batch, component state, daily aggregate, start metadata
+  -> atomic D1 sample batch, component state, daily aggregate, public snapshot
   -> GET /api/status
   -> cache-miss rate limit + 60초 Cache API
   -> Astro 정적 페이지 hydration
@@ -25,9 +25,9 @@ D1 daily aggregate
 
 - Astro는 공개 페이지, 404 페이지, 공지와 점검 이력을 정적으로 빌드한다.
 - Worker는 `/api/checks`, `/api/status`만 먼저 처리하고 나머지는 Static Assets로 전달한다.
-- D1은 원시 sample 35일, component 현재 상태, UTC 일별 aggregate, 최초 관측 singleton을 저장한다.
-- 외부 monitor는 `palate.one`과 `api.palate.one/readyz`만 검사한다. 결과는 두 component를 한 서명 본문으로 전송하며 D1 batch 하나로 전부 반영하거나 전부 롤백한다.
-- 공개 상태 응답은 query string을 거부한다. 성공 응답만 data center별 Cache API에 60초 저장하고 cache miss는 위치별 분당 5회로 제한한다.
+- D1은 원시 sample 35일, component 현재 상태, UTC 일별 aggregate, 최초 관측 시각과 최근 35일 materialized public snapshot 한 행을 저장한다.
+- 외부 monitor는 `palate.one`과 `api.palate.one/readyz`만 검사한다. 결과는 두 component를 한 서명 본문으로 전송하며 D1 batch 하나가 sample, 상태, aggregate, public snapshot을 전부 반영하거나 전부 롤백한다.
+- 공개 상태 응답은 query string을 거부한다. 성공 응답만 data center별 Cache API에 60초 저장하고 cache miss는 위치별 분당 5회로 제한한다. D1 cache miss 비용은 materialized 행 한 개다.
 - 주간 archive는 끝난 ISO week만 공개 JSON으로 저장한다. 이미 존재하는 archive는 덮어쓰지 않는다.
 
 ## 상태 기준
