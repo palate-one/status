@@ -49,6 +49,8 @@ jobs:
         env:
           GENERATED_PATH: ${{ steps.publish.outputs.path }}
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           week="$(basename "$GENERATED_PATH" .json)"
           git commit -m "chore(uptime): publish $week"
           git push

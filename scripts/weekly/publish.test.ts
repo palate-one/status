@@ -289,6 +289,10 @@ describe("public endpoint and archive safety", () => {
     expect(workflow).toContain("bun install --frozen-lockfile");
     expect(workflow).toContain("git add -- \"$GENERATED_PATH\"");
     expect(workflow).toContain("git diff --check");
+    expect(workflow).toContain('git config user.name "github-actions[bot]"');
+    expect(workflow).toContain(
+      'git config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
+    );
     expect(workflow).not.toContain("git add -A");
   });
 
