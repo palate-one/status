@@ -37,7 +37,7 @@ function snapshot(overrides: Partial<StatusSnapshot> = {}): StatusSnapshot {
 
 function createStore(overrides: Partial<StatusStore> = {}): StatusStore {
   return {
-    insertSample: vi.fn(),
+    insertSamples: vi.fn(),
     readStatus: vi.fn().mockResolvedValue(snapshot()),
     deleteExpiredSamples: vi.fn(),
     ...overrides,

@@ -81,16 +81,16 @@ describe("D1 status store", () => {
   });
 
   it("inserts each component and slot once without replaying state", async () => {
-    const first = await store.insertSample(
+    const first = await store.insertSamples([
       sample("web", "2026-08-09T00:03:00Z", "down"),
-    );
-    const replay = await store.insertSample(
+    ]);
+    const replay = await store.insertSamples([
       sample("web", "2026-08-09T00:03:00Z", "down"),
-    );
+    ]);
     const snapshot = await store.readStatus(new Date("2026-08-09T00:03:00Z"));
 
-    expect(first).toEqual({ inserted: true });
-    expect(replay).toEqual({ inserted: false });
+    expect(first).toEqual({ inserted: 1 });
+    expect(replay).toEqual({ inserted: 0 });
     expect(snapshot.states.find((state) => state.component === "web")).toMatchObject({
       status: "unknown",
       consecutiveFailures: 1,
@@ -113,7 +113,7 @@ describe("D1 status store", () => {
     ] as const;
 
     for (const [scheduledAt, result, expectedStatus, expectedFailures] of cases) {
-      await store.insertSample(sample("api", scheduledAt, result));
+      await store.insertSamples([sample("api", scheduledAt, result)]);
       const snapshot = await store.readStatus(new Date(scheduledAt));
       expect(snapshot.states.find((state) => state.component === "api")).toMatchObject({
         status: expectedStatus,
@@ -126,11 +126,11 @@ describe("D1 status store", () => {
     ["keeps history at exactly 15 minutes", "2026-08-09T00:18:00Z", "outage", 2],
     ["resets history one second after 15 minutes", "2026-08-09T00:18:01Z", "unknown", 1],
   ])("%s", async (_case, checkedAt, expectedStatus, expectedFailures) => {
-    await store.insertSample(sample("api", "2026-08-09T00:03:00Z", "down"));
-    await store.insertSample({
+    await store.insertSamples([sample("api", "2026-08-09T00:03:00Z", "down")]);
+    await store.insertSamples([{
       ...sample("api", "2026-08-09T00:18:00Z", "down"),
       checkedAt,
-    });
+    }]);
 
     const snapshot = await store.readStatus(new Date(checkedAt));
     expect(snapshot.states.find((state) => state.component === "api")).toMatchObject({
@@ -146,16 +146,16 @@ describe("D1 status store", () => {
     ["explicit UTC offset", "2026-08-09T00:03:00+00:00"],
   ])("rejects noncanonical checked_at %s", async (_case, checkedAt) => {
     await expect(
-      store.insertSample({
+      store.insertSamples([{
         ...sample("web", "2026-08-09T00:03:00Z", "up"),
         checkedAt,
-      }),
+      }]),
     ).rejects.toThrow();
   });
 
   it("does not let a late sample roll current state backward", async () => {
-    await store.insertSample(sample("web", "2026-08-09T00:08:00Z", "up"));
-    await store.insertSample(sample("web", "2026-08-09T00:03:00Z", "down"));
+    await store.insertSamples([sample("web", "2026-08-09T00:08:00Z", "up")]);
+    await store.insertSamples([sample("web", "2026-08-09T00:03:00Z", "down")]);
 
     const snapshot = await store.readStatus(new Date("2026-08-09T00:08:00Z"));
     expect(snapshot.states.find((state) => state.component === "web")).toMatchObject({
@@ -167,8 +167,8 @@ describe("D1 status store", () => {
   });
 
   it("increments exactly one aggregate counter per accepted sample", async () => {
-    await store.insertSample(sample("web", "2026-08-09T00:03:00Z", "up"));
-    await store.insertSample(sample("web", "2026-08-09T00:08:00Z", "down"));
+    await store.insertSamples([sample("web", "2026-08-09T00:03:00Z", "up")]);
+    await store.insertSamples([sample("web", "2026-08-09T00:08:00Z", "down")]);
 
     const snapshot = await store.readStatus(new Date("2026-08-09T00:08:00Z"));
     expect(snapshot.daily).toEqual([
@@ -183,9 +183,9 @@ describe("D1 status store", () => {
   });
 
   it("deletes only expired samples and respects the batch limit", async () => {
-    await store.insertSample(sample("web", "2026-06-01T00:03:00Z", "up"));
-    await store.insertSample(sample("api", "2026-06-01T00:03:00Z", "up"));
-    await store.insertSample(sample("web", "2026-08-09T00:03:00Z", "up"));
+    await store.insertSamples([sample("web", "2026-06-01T00:03:00Z", "up")]);
+    await store.insertSamples([sample("api", "2026-06-01T00:03:00Z", "up")]);
+    await store.insertSamples([sample("web", "2026-08-09T00:03:00Z", "up")]);
 
     expect(
       await store.deleteExpiredSamples(new Date("2026-07-05T00:00:00Z"), 1),
@@ -202,14 +202,42 @@ describe("D1 status store", () => {
   });
 
   it("reads at most 30 UTC days of aggregates while preserving the original start", async () => {
-    await store.insertSample(sample("web", "2026-06-01T00:03:00Z", "up"));
-    await store.insertSample(sample("web", "2026-07-10T00:03:00Z", "up"));
-    await store.insertSample(sample("web", "2026-07-11T00:03:00Z", "up"));
-    await store.insertSample(sample("web", "2026-08-09T00:03:00Z", "up"));
+    await store.insertSamples([sample("web", "2026-06-01T00:03:00Z", "up")]);
+    await store.insertSamples([sample("web", "2026-07-10T00:03:00Z", "up")]);
+    await store.insertSamples([sample("web", "2026-07-11T00:03:00Z", "up")]);
+    await store.insertSamples([sample("web", "2026-08-09T00:03:00Z", "up")]);
 
     const result = await store.readStatus(new Date("2026-08-09T12:00:00Z"));
 
     expect(result.monitoringStartedAt).toBe("2026-06-01T00:03:00Z");
     expect(result.daily.map(({ day }) => day)).toEqual(["2026-07-11", "2026-08-09"]);
+  });
+
+  it("rolls back the whole envelope when one sample fails", async () => {
+    await expect(
+      store.insertSamples([
+        sample("web", "2026-08-09T00:03:00Z", "up"),
+        { ...sample("api", "2026-08-09T00:03:00Z", "up"), result: "invalid" as "up" },
+      ]),
+    ).rejects.toThrow();
+
+    const [samples, aggregates, snapshot] = await Promise.all([
+      env.TEST_DB.prepare("SELECT COUNT(*) AS count FROM check_samples").first<{
+        count: number;
+      }>(),
+      env.TEST_DB.prepare("SELECT COUNT(*) AS count FROM daily_uptime").first<{
+        count: number;
+      }>(),
+      store.readStatus(new Date("2026-08-09T00:03:00Z")),
+    ]);
+
+    expect(samples?.count).toBe(0);
+    expect(aggregates?.count).toBe(0);
+    expect(snapshot.states).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ component: "web", status: "unknown" }),
+        expect.objectContaining({ component: "api", status: "unknown" }),
+      ]),
+    );
   });
 });

@@ -280,18 +280,23 @@ export function createWorker(options: WorkerOptions = {}): ExportedHandler<Env> 
         return textResponse("unauthorized", 401);
       }
 
+      const store = storeFactory(env.DB);
       try {
-        const store = storeFactory(env.DB);
-        for (const check of payload.checks) {
-          await store.insertSample(toSample(payload.scheduledAt, check));
-        }
+        await store.insertSamples(
+          payload.checks.map((check) => toSample(payload.scheduledAt, check)),
+        );
+      } catch {
+        console.error("status ingestion failed");
+        return textResponse("temporarily unavailable", 503);
+      }
+
+      try {
         await store.deleteExpiredSamples(
           new Date(requestNow.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1_000),
           RETENTION_BATCH_SIZE,
         );
       } catch {
-        console.error("status ingestion failed");
-        return textResponse("temporarily unavailable", 503);
+        console.error("status retention failed");
       }
 
       return new Response(null, { status: 204 });

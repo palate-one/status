@@ -35,7 +35,7 @@ const validPayload: IngestPayload = {
 
 function createStore(overrides: Partial<StatusStore> = {}): StatusStore {
   return {
-    insertSample: vi.fn().mockResolvedValue({ inserted: true }),
+    insertSamples: vi.fn().mockResolvedValue({ inserted: 2 }),
     readStatus: vi.fn(),
     deleteExpiredSamples: vi.fn().mockResolvedValue(0),
     ...overrides,
@@ -93,7 +93,7 @@ describe("status ingestion handler", () => {
     const response = await fetchWith(store, request);
 
     expect(response.status).toBe(415);
-    expect(store.insertSample).not.toHaveBeenCalled();
+    expect(store.insertSamples).not.toHaveBeenCalled();
   });
 
   it("returns 413 before parsing a body larger than 8 KiB", async () => {
@@ -103,7 +103,7 @@ describe("status ingestion handler", () => {
     const response = await fetchWith(store, request);
 
     expect(response.status).toBe(413);
-    expect(store.insertSample).not.toHaveBeenCalled();
+    expect(store.insertSamples).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -129,7 +129,7 @@ describe("status ingestion handler", () => {
 
     expect(response.status).toBe(400);
     expect(await response.text()).toBe("invalid request");
-    expect(store.insertSample).not.toHaveBeenCalled();
+    expect(store.insertSamples).not.toHaveBeenCalled();
   });
 
   it("returns generic 401 for an invalid signature", async () => {
@@ -160,29 +160,25 @@ describe("status ingestion handler", () => {
     );
 
     expect(response.status).toBe(401);
-    expect(store.insertSample).not.toHaveBeenCalled();
+    expect(store.insertSamples).not.toHaveBeenCalled();
   });
 
   it.each([
-    ["insert", true],
-    ["duplicate replay", false],
+    ["insert", 2],
+    ["duplicate replay", 0],
   ])("returns 204 for an accepted %s", async (_case, inserted) => {
     const store = createStore({
-      insertSample: vi.fn().mockResolvedValue({ inserted }),
+      insertSamples: vi.fn().mockResolvedValue({ inserted }),
     });
 
     const response = await fetchWith(store, await signedRequest());
 
     expect(response.status).toBe(204);
-    expect(store.insertSample).toHaveBeenCalledTimes(2);
-    expect(store.insertSample).toHaveBeenNthCalledWith(1, {
-      ...validPayload.checks[0],
-      scheduledAt: validPayload.scheduledAt,
-    });
-    expect(store.insertSample).toHaveBeenNthCalledWith(2, {
-      ...validPayload.checks[1],
-      scheduledAt: validPayload.scheduledAt,
-    });
+    expect(store.insertSamples).toHaveBeenCalledOnce();
+    expect(store.insertSamples).toHaveBeenCalledWith([
+      { ...validPayload.checks[0], scheduledAt: validPayload.scheduledAt },
+      { ...validPayload.checks[1], scheduledAt: validPayload.scheduledAt },
+    ]);
     expect(store.deleteExpiredSamples).toHaveBeenCalledWith(
       new Date("2026-07-05T12:00:00Z"),
       1_000,
@@ -194,7 +190,7 @@ describe("status ingestion handler", () => {
     const rawBody = JSON.stringify(validPayload);
     const signature = await signBody(SECRET, TIMESTAMP, rawBody);
     const store = createStore({
-      insertSample: vi
+      insertSamples: vi
         .fn()
         .mockRejectedValue(new Error(`${SECRET} ${signature} ${rawBody}`)),
     });
@@ -214,5 +210,21 @@ describe("status ingestion handler", () => {
       expect(responseBody).not.toContain(sensitive);
       expect(logs).not.toContain(sensitive);
     }
+  });
+
+  it("accepts a committed envelope when best-effort retention fails", async () => {
+    const store = createStore({
+      deleteExpiredSamples: vi.fn().mockRejectedValue(new Error("private D1 detail")),
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await fetchWith(store, await signedRequest());
+    const logs = errorSpy.mock.calls.flat().join(" ");
+    errorSpy.mockRestore();
+
+    expect(response.status).toBe(204);
+    expect(store.insertSamples).toHaveBeenCalledOnce();
+    expect(logs).toBe("status retention failed");
+    expect(logs).not.toContain("private D1 detail");
   });
 });

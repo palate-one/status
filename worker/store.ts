@@ -22,7 +22,7 @@ export type StatusSnapshot = {
 };
 
 export type StatusStore = {
-  insertSample(sample: CheckSample): Promise<{ inserted: boolean }>;
+  insertSamples(samples: readonly CheckSample[]): Promise<{ inserted: number }>;
   readStatus(now: Date): Promise<StatusSnapshot>;
   deleteExpiredSamples(cutoff: Date, limit: number): Promise<number>;
 };
@@ -97,33 +97,41 @@ function mapDaily(row: DailyRow): DailyAggregateRow {
 
 export function createD1StatusStore(db: D1Database): StatusStore {
   return {
-    async insertSample(sample: CheckSample): Promise<{ inserted: boolean }> {
-      const inserted = await db
-        .prepare(`
-          INSERT INTO check_samples (
-            component,
-            scheduled_at,
-            checked_at,
-            result,
-            latency_ms,
-            http_status,
-            failure_code
-          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-          ON CONFLICT (component, scheduled_at) DO NOTHING
-          RETURNING id
-        `)
-        .bind(
-          sample.component,
-          sample.scheduledAt,
-          sample.checkedAt,
-          sample.result,
-          sample.latencyMs,
-          sample.httpStatus,
-          sample.failureCode,
-        )
-        .first<{ id: number }>();
+    async insertSamples(samples: readonly CheckSample[]): Promise<{ inserted: number }> {
+      if (samples.length < 1 || samples.length > 2) {
+        throw new RangeError("sample batch must contain one or two samples");
+      }
 
-      return { inserted: inserted !== null };
+      const statement = db.prepare(`
+        INSERT INTO check_samples (
+          component,
+          scheduled_at,
+          checked_at,
+          result,
+          latency_ms,
+          http_status,
+          failure_code
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        ON CONFLICT (component, scheduled_at) DO NOTHING
+        RETURNING id
+      `);
+      const results = await db.batch(
+        samples.map((sample) =>
+          statement.bind(
+            sample.component,
+            sample.scheduledAt,
+            sample.checkedAt,
+            sample.result,
+            sample.latencyMs,
+            sample.httpStatus,
+            sample.failureCode,
+          ),
+        ),
+      );
+
+      return {
+        inserted: results.reduce((total, result) => total + result.results.length, 0),
+      };
     },
 
     async readStatus(now: Date): Promise<StatusSnapshot> {
