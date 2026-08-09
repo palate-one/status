@@ -7,6 +7,7 @@ describe("public deployment config", () => {
     const source = await readFile("wrangler.jsonc", "utf8");
     const config = JSON.parse(source) as {
       d1_databases: Array<{ database_id: string }>;
+      routes?: Array<{ custom_domain: boolean; pattern: string }>;
       vars?: Record<string, string>;
     };
 
@@ -18,6 +19,12 @@ describe("public deployment config", () => {
       "00000000-0000-0000-0000-000000000000",
     );
     expect(config.vars).toBeUndefined();
+    expect(config.routes).toEqual([
+      {
+        pattern: "status.palate.one",
+        custom_domain: true,
+      },
+    ]);
     expect(source).not.toMatch(/STATUS_INGEST_SECRET\s*["':=]/);
   });
 });
