@@ -9,8 +9,9 @@ GitHub Actions monitor (5분)
   -> Web / API 공개 health 확인
   -> HMAC 서명 POST /api/checks
   -> Cloudflare Worker
-  -> D1 sample, component state, daily aggregate
+  -> atomic D1 sample batch, component state, daily aggregate, start metadata
   -> GET /api/status
+  -> cache-miss rate limit + 60초 Cache API
   -> Astro 정적 페이지 hydration
 
 GitHub Markdown
@@ -24,8 +25,9 @@ D1 daily aggregate
 
 - Astro는 공개 페이지, 404 페이지, 공지와 점검 이력을 정적으로 빌드한다.
 - Worker는 `/api/checks`, `/api/status`만 먼저 처리하고 나머지는 Static Assets로 전달한다.
-- D1은 원시 sample 35일, component 현재 상태, UTC 일별 aggregate를 저장한다.
-- 외부 monitor는 `palate.one`과 `api.palate.one/readyz`만 검사한다. 결과는 두 component를 한 서명 본문으로 전송한다.
+- D1은 원시 sample 35일, component 현재 상태, UTC 일별 aggregate, 최초 관측 singleton을 저장한다.
+- 외부 monitor는 `palate.one`과 `api.palate.one/readyz`만 검사한다. 결과는 두 component를 한 서명 본문으로 전송하며 D1 batch 하나로 전부 반영하거나 전부 롤백한다.
+- 공개 상태 응답은 query string을 거부한다. 성공 응답만 data center별 Cache API에 60초 저장하고 cache miss는 위치별 분당 5회로 제한한다.
 - 주간 archive는 끝난 ISO week만 공개 JSON으로 저장한다. 이미 존재하는 archive는 덮어쓰지 않는다.
 
 ## 상태 기준
@@ -85,7 +87,7 @@ git diff --check
 
 ## 무료 운영 경계
 
-구성은 공개 저장소의 GitHub Actions와 Cloudflare Workers/D1 무료 사용량 안에서 운영하는 것을 목표로 한다. 5분 schedule은 하루 최대 288번 실행된다. 다만 GitHub schedule은 정확한 실행 시각 SLA가 아니며, Cloudflare 무료 사용량은 account 전체에서 공유된다. 배포 전에 현재 공식 한도와 account 사용량을 다시 확인해야 한다.
+구성은 공개 저장소의 GitHub Actions와 Cloudflare Workers/D1 무료 사용량 안에서 운영하는 것을 목표로 한다. 5분 schedule은 하루 최대 288번 실행된다. 다만 GitHub schedule은 정확한 실행 시각 SLA가 아니며, Cloudflare 무료 사용량은 account 전체에서 공유된다. Cache API와 Worker rate limit은 data center별이며 rate limit은 의도적으로 eventually consistent하다. 배포 전에 현재 공식 한도와 account 사용량을 다시 확인해야 한다.
 
 Workers Builds의 build/deploy command와 watch path는 Cloudflare dashboard 설정이다. Wrangler의 custom build 설정만으로 대체되지 않는다. 주간 archive-only commit의 build 제외가 정확히 지원되지 않으면 주 1회 build를 허용하고 임의 diff script를 추가하지 않는다.
 
