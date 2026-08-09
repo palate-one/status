@@ -1,0 +1,75 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+
+import { sortIncidentHistory, sortIncidents } from "../status/view-model";
+
+interface Props {
+  entries: readonly CollectionEntry<"incidents">[];
+  mode: "active" | "history";
+}
+
+const { entries, mode } = Astro.props;
+const orderedEntries = mode === "active" ? sortIncidents(entries) : sortIncidentHistory(entries);
+const visibleEntries = orderedEntries.filter(({ data }) =>
+  mode === "active" ? data.status !== "resolved" : data.status === "resolved",
+);
+const renderedEntries = await Promise.all(
+  visibleEntries.map(async (entry) => ({ entry, Content: (await render(entry)).Content })),
+);
+
+const incidentStatusLabel = {
+  investigating: "조사 중",
+  identified: "원인 확인 중",
+  monitoring: "복구 확인 중",
+  resolved: "해결됨",
+} as const;
+const severityLabel = {
+  degraded: "성능 저하",
+  partial_outage: "부분 장애",
+  major_outage: "주요 장애",
+} as const;
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+---
+
+<section class="status-section" aria-labelledby={mode === "active" ? "active-incidents-heading" : "incident-history-heading"}>
+  <div class="section-heading">
+    <p class="eyebrow">운영 기록</p>
+    <h2 id={mode === "active" ? "active-incidents-heading" : "incident-history-heading"}>
+      {mode === "active" ? "진행 중인 장애" : "종료된 장애"}
+    </h2>
+  </div>
+  {visibleEntries.length === 0 ? (
+    <p class="empty-state">
+      {mode === "active" ? "현재 진행 중인 장애가 없어요." : "종료된 장애 기록이 없어요."}
+    </p>
+  ) : (
+    <div class="timeline-list">
+      {renderedEntries.map(({ entry, Content }) => (
+        <article class="timeline-entry" data-incident-id={entry.data.id}>
+          <header class="timeline-entry-heading">
+            <div class="entry-tags">
+              <span class="entry-tag">{severityLabel[entry.data.severity]}</span>
+              <span class="entry-status">{incidentStatusLabel[entry.data.status]}</span>
+            </div>
+            <time datetime={entry.data.startedAt}>{formatDate(entry.data.startedAt)}</time>
+          </header>
+          <h3>{entry.data.title}</h3>
+          <p class="entry-components">영향 범위 · {entry.data.components.map((component) => component.toUpperCase()).join(", ")}</p>
+          <div class="entry-body"><Content /></div>
+          {entry.data.resolvedAt ? (
+            <p class="entry-resolution"><time datetime={entry.data.resolvedAt}>해결 · {formatDate(entry.data.resolvedAt)}</time></p>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  )}
+</section>

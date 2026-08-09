@@ -1,0 +1,45 @@
+---
+import type { DailyUptimeViewModel } from "../status/view-model";
+
+interface Props {
+  componentLabel: string;
+  days: readonly DailyUptimeViewModel[];
+}
+
+const { componentLabel, days } = Astro.props;
+---
+
+<section
+  class="uptime-block"
+  data-uptime-component={componentLabel.toLowerCase()}
+  aria-labelledby={`${componentLabel.toLowerCase()}-uptime-heading`}
+>
+  <div class="uptime-heading">
+    <h4 id={`${componentLabel.toLowerCase()}-uptime-heading`}>최근 30일</h4>
+    <p>하루별 관측 기록</p>
+  </div>
+  <ol class="uptime-rail" data-uptime-list>
+    {days.length === 0 ? (
+      <li class="empty-day">측정 데이터 없음</li>
+    ) : (
+      days.map((day) => (
+        <li
+          class:list={[
+            "uptime-day",
+            day.uptimePercent === null ? "is-empty" : day.downSamples > 0 ? "has-down" : "is-up",
+          ]}
+          data-uptime-day={day.day}
+          aria-label={day.ariaLabel}
+        >
+          <span class="day-mark" aria-hidden="true">
+            {day.uptimePercent === null ? "—" : day.downSamples > 0 ? "!" : "✓"}
+          </span>
+          <span class="day-label">{day.dateLabel}</span>
+          <span class="day-counts">{day.upSamples}↑ · {day.downSamples}↓</span>
+          <span class="day-coverage">{day.coverageLabel}</span>
+        </li>
+      ))
+    )}
+  </ol>
+  <p class="uptime-note">각 칸을 선택하지 않아도 날짜, 정상·문제 횟수, 측정 범위를 읽을 수 있어요.</p>
+</section>

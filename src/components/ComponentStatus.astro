@@ -1,0 +1,40 @@
+---
+import type { ComponentStatusViewModel } from "../status/view-model";
+
+interface Props {
+  component: ComponentStatusViewModel;
+  loading?: boolean;
+}
+
+const { component, loading = false } = Astro.props;
+const mark = component.status === "operational" ? "✓" : component.status === "outage" ? "!" : "?";
+---
+
+<article
+  class={`component-status status-${component.status}`}
+  data-component-id={component.id}
+  data-component-state={component.status}
+  aria-labelledby={`${component.id}-heading`}
+>
+  <header class="component-heading">
+    <h3 id={`${component.id}-heading`}>{component.label}</h3>
+    <p class="component-state" data-component-state-label aria-live="polite">
+      <span class="status-mark" data-component-mark aria-hidden="true">{mark}</span>
+      <span data-component-status-label>{loading ? "상태 확인 중" : component.statusLabel}</span>
+    </p>
+  </header>
+  <dl class="component-metrics">
+    <div>
+      <dt>30일 가동률</dt>
+      <dd data-component-uptime>{component.uptimeLabel}</dd>
+    </div>
+    <div>
+      <dt>측정 범위</dt>
+      <dd data-component-coverage>{component.coverageLabel}</dd>
+    </div>
+    <div>
+      <dt>마지막 관측</dt>
+      <dd data-component-last-checked>{component.lastCheckedLabel}</dd>
+    </div>
+  </dl>
+</article>

@@ -1,0 +1,29 @@
+---
+import type { PublicStatusResponse } from "../../worker/read";
+
+interface Props {
+  status: PublicStatusResponse["overall"];
+  label: string;
+  lastCheckedLabel: string;
+}
+
+const { status, label, lastCheckedLabel } = Astro.props;
+const mark = status === "operational" ? "✓" : status === "service_disruption" ? "!" : "?";
+---
+
+<section
+  class={`overall-status status-${status}`}
+  data-overall-status
+  data-overall-state={status}
+  aria-labelledby="overall-heading"
+>
+  <p class="eyebrow">Palate 서비스 상태</p>
+  <h1 id="overall-heading">현재 서비스 상태</h1>
+  <div class="overall-state" aria-live="polite" aria-label={`서비스 전체 상태: ${label}`}>
+    <span class="status-mark" data-overall-mark aria-hidden="true">{mark}</span>
+    <span data-overall-label>{label}</span>
+  </div>
+  <p class="last-checked" data-overall-last-checked>
+    마지막 관측 · {lastCheckedLabel}
+  </p>
+</section>

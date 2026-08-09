@@ -1,0 +1,72 @@
+---
+import { render, type CollectionEntry } from "astro:content";
+
+import { sortMaintenance, sortMaintenanceHistory } from "../status/view-model";
+
+interface Props {
+  entries: readonly CollectionEntry<"maintenance">[];
+  mode: "upcoming" | "history";
+}
+
+const { entries, mode } = Astro.props;
+const orderedEntries = mode === "upcoming" ? sortMaintenance(entries) : sortMaintenanceHistory(entries);
+const visibleEntries = orderedEntries.filter(({ data }) =>
+  mode === "upcoming"
+    ? data.status === "scheduled" || data.status === "in_progress"
+    : data.status === "completed" || data.status === "cancelled",
+);
+const renderedEntries = await Promise.all(
+  visibleEntries.map(async (entry) => ({ entry, Content: (await render(entry)).Content })),
+);
+
+const maintenanceStatusLabel = {
+  scheduled: "예정",
+  in_progress: "진행 중",
+  completed: "완료",
+  cancelled: "취소됨",
+} as const;
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+---
+
+<section class="status-section" aria-labelledby={mode === "upcoming" ? "maintenance-heading" : "maintenance-history-heading"}>
+  <div class="section-heading">
+    <p class="eyebrow">예정된 변경</p>
+    <h2 id={mode === "upcoming" ? "maintenance-heading" : "maintenance-history-heading"}>
+      {mode === "upcoming" ? "점검 일정" : "완료된 점검"}
+    </h2>
+  </div>
+  {visibleEntries.length === 0 ? (
+    <p class="empty-state">
+      {mode === "upcoming" ? "예정된 점검이 없어요." : "완료된 점검 기록이 없어요."}
+    </p>
+  ) : (
+    <div class="timeline-list">
+      {renderedEntries.map(({ entry, Content }) => (
+        <article class="timeline-entry" data-maintenance-id={entry.data.id}>
+          <header class="timeline-entry-heading">
+            <div class="entry-tags">
+              <span class="entry-tag">{maintenanceStatusLabel[entry.data.status]}</span>
+            </div>
+            <time datetime={entry.data.startsAt}>{formatDate(entry.data.startsAt)}</time>
+          </header>
+          <h3>{entry.data.title}</h3>
+          <p class="entry-components">영향 범위 · {entry.data.components.map((component) => component.toUpperCase()).join(", ")}</p>
+          <dl class="maintenance-time">
+            <div><dt>시작</dt><dd><time datetime={entry.data.startsAt}>{formatDate(entry.data.startsAt)}</time></dd></div>
+            {entry.data.endsAt ? <div><dt>종료</dt><dd><time datetime={entry.data.endsAt}>{formatDate(entry.data.endsAt)}</time></dd></div> : null}
+          </dl>
+          <div class="entry-body"><Content /></div>
+        </article>
+      ))}
+    </div>
+  )}
+</section>

@@ -1,0 +1,100 @@
+---
+import { getCollection } from "astro:content";
+
+import ComponentStatus from "../components/ComponentStatus.astro";
+import IncidentList from "../components/IncidentList.astro";
+import MaintenanceList from "../components/MaintenanceList.astro";
+import OverallStatus from "../components/OverallStatus.astro";
+import StatusLayout from "../layouts/StatusLayout.astro";
+import UptimeBars from "../components/UptimeBars.astro";
+import type { ComponentStatusViewModel } from "../status/view-model";
+
+const incidents = await getCollection("incidents");
+const maintenance = await getCollection("maintenance");
+
+const initialComponents: ComponentStatusViewModel[] = [
+  {
+    id: "web",
+    label: "Web",
+    status: "unknown",
+    statusLabel: "상태 확인 불가",
+    uptimeLabel: "데이터 없음",
+    coverageLabel: "데이터 없음",
+    lastCheckedLabel: "상태 확인 중",
+    days: [],
+  },
+  {
+    id: "api",
+    label: "API",
+    status: "unknown",
+    statusLabel: "상태 확인 불가",
+    uptimeLabel: "데이터 없음",
+    coverageLabel: "데이터 없음",
+    lastCheckedLabel: "상태 확인 중",
+    days: [],
+  },
+];
+---
+
+<StatusLayout>
+  <main id="main-content" class="status-page" data-status-page aria-busy="true">
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="brand" href="/" aria-label="Palate 상태 페이지 홈">Palate <span>status</span></a>
+        <p>공개 운영 기록</p>
+      </div>
+    </header>
+
+    <div class="status-content">
+      <OverallStatus
+        status="verification_unavailable"
+        label="상태 확인 중"
+        lastCheckedLabel="잠시만 기다려 주세요"
+      />
+
+      <section class="status-section" aria-labelledby="components-heading">
+        <div class="section-heading">
+          <p class="eyebrow">서비스 구성 요소</p>
+          <h2 id="components-heading">Web과 API</h2>
+        </div>
+        <div class="component-grid" data-component-list>
+          {initialComponents.map((component) => <ComponentStatus component={component} loading />)}
+        </div>
+      </section>
+
+      <section class="status-section uptime-section" aria-labelledby="uptime-heading">
+        <div class="section-heading">
+          <p class="eyebrow">측정 기록</p>
+          <h2 id="uptime-heading">최근 30일 업타임</h2>
+          <p class="section-description">정상·문제 표본과 측정 범위를 함께 보여줘요. 빈 날은 장애가 아니라 관측 없음이에요.</p>
+        </div>
+        <div class="uptime-list" data-uptime-components>
+          {initialComponents.map((component) => (
+            <UptimeBars componentLabel={component.label} days={component.days} />
+          ))}
+        </div>
+      </section>
+
+      <IncidentList entries={incidents} mode="active" />
+      <MaintenanceList entries={maintenance} mode="upcoming" />
+      <section class="history-section" aria-labelledby="history-heading">
+        <div class="section-heading">
+          <p class="eyebrow">지난 기록</p>
+          <h2 id="history-heading">종료·완료 이력</h2>
+        </div>
+        <IncidentList entries={incidents} mode="history" />
+        <MaintenanceList entries={maintenance} mode="history" />
+      </section>
+
+      <footer class="site-footer">
+        <p>이 페이지는 공개 Web 응답과 API readiness 관측만 보여줘요. 모든 사용자 흐름의 정상 동작을 뜻하지 않아요.</p>
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    import { hydrateStatus } from "../scripts/status-client";
+
+    hydrateStatus();
+  </script>
+</StatusLayout>
