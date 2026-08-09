@@ -286,7 +286,7 @@ describe("public endpoint and archive safety", () => {
 
     expect(workflow).toContain('cron: "17 0 * * 1"');
     expect(workflow).toContain("contents: write");
-    expect(workflow).toContain("pull-requests: write");
+    expect(workflow).not.toContain("pull-requests: write");
     expect(workflow).toContain("actions: write");
     expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain(
@@ -300,7 +300,8 @@ describe("public endpoint and archive safety", () => {
       'git config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
     );
     expect(workflow).toContain('git push origin "HEAD:refs/heads/$branch"');
-    expect(workflow).toContain("gh pr create");
+    expect(workflow).toContain("compare/main...$branch?expand=1");
+    expect(workflow).not.toContain("gh pr create");
     expect(workflow).toContain("gh workflow run ci.yml");
     expect(workflow).not.toContain("\n          git push\n");
     expect(workflow).not.toContain("git add -A");

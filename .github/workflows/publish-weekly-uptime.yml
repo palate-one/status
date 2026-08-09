@@ -17,7 +17,6 @@ jobs:
     permissions:
       actions: write
       contents: write
-      pull-requests: write
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
@@ -47,26 +46,29 @@ jobs:
           git diff --check
           git add -- "$GENERATED_PATH"
           git diff --cached --check
-      - name: Open publication pull request
+      - name: Push reviewed publication branch
         env:
           GENERATED_PATH: ${{ steps.publish.outputs.path }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           week="$(basename "$GENERATED_PATH" .json)"
           branch="automation/uptime-$week"
-          git commit -m "chore(uptime): publish $week"
-          if gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq 'length > 0' | rg '^true$'; then
-            echo "publication pull request already exists"
+          write_summary() {
+            {
+              echo "### Weekly uptime archive ready"
+              echo
+              echo "- Branch: $branch"
+              echo "- Open PR: https://github.com/$GITHUB_REPOSITORY/compare/main...$branch?expand=1"
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+          if git ls-remote --exit-code --heads origin "refs/heads/$branch" > /dev/null; then
+            write_summary
             exit 0
           fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(uptime): publish $week"
           gh auth setup-git
           git push origin "HEAD:refs/heads/$branch"
-          gh pr create \
-            --repo "$GITHUB_REPOSITORY" \
-            --base main \
-            --head "$branch" \
-            --title "chore(uptime): publish $week" \
-            --body "Automated weekly uptime archive for $week."
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
+          write_summary
