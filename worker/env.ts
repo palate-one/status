@@ -4,9 +4,7 @@ import type {
   SampleResult,
 } from "../src/status/types";
 
-export type Env = {
-  DB: D1Database;
-  ASSETS: Fetcher;
+export type Env = Pick<Cloudflare.Env, "DB" | "ASSETS"> & {
   STATUS_INGEST_SECRET: string;
 };
 
