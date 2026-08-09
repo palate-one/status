@@ -21,15 +21,24 @@ describe("status page build", () => {
     expect(html).not.toContain("Read uptime graph for undefined");
     expect(html).toContain('src="/palate-logo.svg"');
     expect(html).toContain('aria-label="Palate 상태 페이지 홈"');
+    expect(html).not.toContain("<span>status</span>");
   });
 
-  it("keeps service names and mobile metric values readable", async () => {
+  it("keeps service names, mobile metric values, and the header logo readable", async () => {
     const css = await readFile("src/styles/global.css", "utf8");
+    const brandRule = css.match(/\.brand\s*\{([^}]*)\}/)?.[1] ?? "";
+    const logoRule = css.match(/\.brand-logo\s*\{([^}]*)\}/)?.[1] ?? "";
     const gridRule = css.match(/\.component-status\s*\{([^}]*)\}/)?.[1] ?? "";
     const headingRule = css.match(/\.component-heading h3\s*\{([^}]*)\}/)?.[1] ?? "";
     const stateRule = css.match(/\.component-state\s*\{\s*margin:\s*0;([^}]*)\}/)?.[1] ?? "";
     const metricRule = css.match(/\.component-metrics dd\s*\{([^}]*)\}/)?.[1] ?? "";
 
+    expect(brandRule).toContain("align-items: center;");
+    expect(logoRule).toContain("flex: 0 0 72px;");
+    expect(logoRule).toContain("width: 72px;");
+    expect(logoRule).toContain("height: 24px;");
+    expect(logoRule).toContain("object-fit: cover;");
+    expect(logoRule).toContain("object-position: center;");
     expect(gridRule).toContain("minmax(max-content, 0.7fr)");
     expect(headingRule).toContain("white-space: nowrap;");
     expect(stateRule).toContain("white-space: nowrap;");
@@ -43,6 +52,15 @@ describe("status page build", () => {
 
     expect(noteRule).toContain("color: var(--text-muted);");
     expect(noteRule).not.toContain("var(--text-faint)");
+  });
+
+  it("renders outage uptime segments as solid red fills", async () => {
+    const css = await readFile("src/styles/global.css", "utf8");
+    const outageRule = css.match(/\.uptime-day\.has-down\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(outageRule).toContain("border-color: var(--red);");
+    expect(outageRule).toContain("background: var(--red);");
+    expect(css).not.toMatch(/\.uptime-day\.has-down::after\s*\{/);
   });
 
   it("renders resolved history as one KST date group in completion order", async () => {
