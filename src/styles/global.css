@@ -13,7 +13,7 @@
   --green-soft: #eaf6f1;
   --red: #b52b3e;
   --red-soft: #fff0f1;
-  --unknown: #70757a;
+  --unknown: #5f6368;
   --unknown-soft: #f1f2f2;
   --max-reading: 960px;
   --radius-sm: 8px;
@@ -245,8 +245,7 @@ h4 {
   color: var(--unknown);
 }
 
-.status-section,
-.history-section {
+.status-section {
   padding-block: 32px;
   border-bottom: 1px solid var(--divider);
 }
@@ -361,6 +360,7 @@ h4 {
 }
 
 .uptime-day {
+  position: relative;
   min-width: 0;
   height: 42px;
   border: 1px solid var(--divider);
@@ -391,6 +391,22 @@ h4 {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+.uptime-day.has-down .day-mark {
+  display: grid;
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  place-items: center;
+  overflow: visible;
+  clip: auto;
+  color: var(--canvas);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: normal;
 }
 
 .uptime-empty-label {
