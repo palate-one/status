@@ -282,9 +282,13 @@ describe("public endpoint and archive safety", () => {
 
   it("runs once after Monday UTC rollover with narrow publication safeguards", async () => {
     const workflow = await readFile(".github/workflows/publish-weekly-uptime.yml", "utf8");
+    const ciWorkflow = await readFile(".github/workflows/ci.yml", "utf8");
 
     expect(workflow).toContain('cron: "17 0 * * 1"');
     expect(workflow).toContain("contents: write");
+    expect(workflow).toContain("pull-requests: write");
+    expect(workflow).toContain("actions: write");
+    expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain(
       "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
     );
@@ -295,7 +299,12 @@ describe("public endpoint and archive safety", () => {
     expect(workflow).toContain(
       'git config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
     );
+    expect(workflow).toContain('git push origin "HEAD:refs/heads/$branch"');
+    expect(workflow).toContain("gh pr create");
+    expect(workflow).toContain("gh workflow run ci.yml");
+    expect(workflow).not.toContain("\n          git push\n");
     expect(workflow).not.toContain("git add -A");
+    expect(ciWorkflow).toContain("workflow_dispatch:");
   });
 
   it("protects the four sensitive repository paths with the verified maintainer", async () => {
