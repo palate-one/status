@@ -227,8 +227,12 @@ describe("monitor workflow", () => {
     expect(workflow).toContain('cron: "3-58/5 * * * *"');
     expect(workflow).toContain("contents: read");
     expect(workflow).toContain("timeout-minutes: 2");
-    expect(workflow).toContain("actions/checkout@v6");
-    expect(workflow).toContain("oven-sh/setup-bun@v2");
+    expect(workflow).toContain(
+      "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+    );
+    expect(workflow).toContain(
+      "oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+    );
     expect(workflow).toContain("bun install --frozen-lockfile");
     expect(workflow).toContain("vars.STATUS_INGEST_URL");
     expect(workflow).toContain("secrets.STATUS_INGEST_SECRET");

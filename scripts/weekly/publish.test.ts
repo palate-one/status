@@ -285,7 +285,9 @@ describe("public endpoint and archive safety", () => {
 
     expect(workflow).toContain('cron: "17 0 * * 1"');
     expect(workflow).toContain("contents: write");
-    expect(workflow).toContain("actions/checkout@v6");
+    expect(workflow).toContain(
+      "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+    );
     expect(workflow).toContain("bun install --frozen-lockfile");
     expect(workflow).toContain("git add -- \"$GENERATED_PATH\"");
     expect(workflow).toContain("git diff --check");
