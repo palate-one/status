@@ -122,18 +122,35 @@ describe("D1 status store", () => {
     }
   });
 
-  it("resets stale failure history before applying a new failure", async () => {
+  it.each([
+    ["keeps history at exactly 15 minutes", "2026-08-09T00:18:00Z", "outage", 2],
+    ["resets history one second after 15 minutes", "2026-08-09T00:18:01Z", "unknown", 1],
+  ])("%s", async (_case, checkedAt, expectedStatus, expectedFailures) => {
     await store.insertSample(sample("api", "2026-08-09T00:03:00Z", "down"));
     await store.insertSample({
-      ...sample("api", "2026-08-09T00:23:00Z", "down"),
-      checkedAt: "2026-08-09T00:23:01Z",
+      ...sample("api", "2026-08-09T00:18:00Z", "down"),
+      checkedAt,
     });
 
-    const snapshot = await store.readStatus(new Date("2026-08-09T00:23:01Z"));
+    const snapshot = await store.readStatus(new Date(checkedAt));
     expect(snapshot.states.find((state) => state.component === "api")).toMatchObject({
-      status: "unknown",
-      consecutiveFailures: 1,
+      status: expectedStatus,
+      consecutiveFailures: expectedFailures,
     });
+  });
+
+  it.each([
+    ["fractional seconds", "2026-08-09T00:03:00.100Z"],
+    ["Julian timestamp text", "2461192.50208333"],
+    ["space-separated UTC", "2026-08-09 00:03:00"],
+    ["explicit UTC offset", "2026-08-09T00:03:00+00:00"],
+  ])("rejects noncanonical checked_at %s", async (_case, checkedAt) => {
+    await expect(
+      store.insertSample({
+        ...sample("web", "2026-08-09T00:03:00Z", "up"),
+        checkedAt,
+      }),
+    ).rejects.toThrow();
   });
 
   it("does not let a late sample roll current state backward", async () => {

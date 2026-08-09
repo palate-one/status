@@ -5,7 +5,12 @@ CREATE TABLE check_samples (
     CHECK (unixepoch(scheduled_at) IS NOT NULL)
     CHECK (scheduled_at GLOB '????-??-??T??:??:00Z')
     CHECK (CAST(strftime('%M', scheduled_at) AS INTEGER) % 5 = 3),
-  checked_at TEXT NOT NULL CHECK (unixepoch(checked_at) IS NOT NULL),
+  checked_at TEXT NOT NULL
+    CHECK (typeof(checked_at) = 'text')
+    CHECK (length(checked_at) = 20)
+    CHECK (checked_at GLOB '????-??-??T??:??:??Z')
+    CHECK (unixepoch(checked_at) IS NOT NULL)
+    CHECK (strftime('%Y-%m-%dT%H:%M:%SZ', checked_at) = checked_at),
   result TEXT NOT NULL CHECK (result IN ('up', 'down')),
   latency_ms INTEGER NOT NULL
     CHECK (typeof(latency_ms) = 'integer' AND latency_ms BETWEEN 0 AND 120000),
