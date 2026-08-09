@@ -200,4 +200,16 @@ describe("D1 status store", () => {
       scheduled_at: "2026-08-09T00:03:00Z",
     });
   });
+
+  it("reads at most 30 UTC days of aggregates while preserving the original start", async () => {
+    await store.insertSample(sample("web", "2026-06-01T00:03:00Z", "up"));
+    await store.insertSample(sample("web", "2026-07-10T00:03:00Z", "up"));
+    await store.insertSample(sample("web", "2026-07-11T00:03:00Z", "up"));
+    await store.insertSample(sample("web", "2026-08-09T00:03:00Z", "up"));
+
+    const result = await store.readStatus(new Date("2026-08-09T12:00:00Z"));
+
+    expect(result.monitoringStartedAt).toBe("2026-06-01T00:03:00Z");
+    expect(result.daily.map(({ day }) => day)).toEqual(["2026-07-11", "2026-08-09"]);
+  });
 });

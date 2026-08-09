@@ -1,3 +1,3 @@
-import { createWorker } from "./ingest";
+import { createPublicStatusWorker } from "./read";
 
-export default createWorker();
+export default createPublicStatusWorker();

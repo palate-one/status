@@ -63,6 +63,15 @@ function assertRetentionLimit(limit: number): void {
   }
 }
 
+function statusWindow(nowIso: string): { startDay: string; endDay: string } {
+  const endDay = nowIso.slice(0, 10);
+  const endDayStart = Date.parse(`${endDay}T00:00:00Z`);
+  const startDay = new Date(endDayStart - 29 * 24 * 60 * 60 * 1_000)
+    .toISOString()
+    .slice(0, 10);
+  return { startDay, endDay };
+}
+
 function mapState(row: StateRow): ComponentState {
   return {
     component: row.component,
@@ -118,7 +127,8 @@ export function createD1StatusStore(db: D1Database): StatusStore {
     },
 
     async readStatus(now: Date): Promise<StatusSnapshot> {
-      assertValidDate("now", now);
+      const nowIso = assertValidDate("now", now);
+      const { startDay, endDay } = statusWindow(nowIso);
 
       const [stateResult, dailyResult, monitoringResult] = await db.batch([
         db.prepare(`
@@ -142,8 +152,9 @@ export function createD1StatusStore(db: D1Database): StatusStore {
             first_scheduled_at,
             last_scheduled_at
           FROM daily_uptime
+          WHERE day BETWEEN ?1 AND ?2
           ORDER BY day, component
-        `),
+        `).bind(startDay, endDay),
         db.prepare(`
           SELECT MIN(first_scheduled_at) AS monitoring_started_at
           FROM daily_uptime
