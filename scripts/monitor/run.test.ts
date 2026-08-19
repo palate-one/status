@@ -147,7 +147,7 @@ describe("signed check delivery", () => {
 });
 
 describe("monitor run ordering and redaction", () => {
-  it("delivers a down observation before writing summary and failing", async () => {
+  it("delivers a down observation before writing summary without failing", async () => {
     const events: string[] = [];
     let summary = "";
     const fetcher = fetchMock(async (input) => {
@@ -174,7 +174,7 @@ describe("monitor run ordering and redaction", () => {
           summary = value;
         },
       }),
-    ).rejects.toThrow("one or more status checks failed");
+    ).resolves.toBeUndefined();
 
     expect(events).toEqual(["delivered", "summary"]);
     expect(summary).toContain("Web");

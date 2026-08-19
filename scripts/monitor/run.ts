@@ -167,9 +167,6 @@ export async function runMonitor(input: RunMonitorInput): Promise<void> {
   if (ingestionFailed) {
     throw new Error("status ingestion failed");
   }
-  if (checks.some(({ result }) => result === "down")) {
-    throw new Error("one or more status checks failed");
-  }
 }
 
 async function main(): Promise<void> {
