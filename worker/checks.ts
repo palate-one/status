@@ -207,6 +207,7 @@ async function checkApiAttempt(fetcher: typeof fetch): Promise<AttemptResult> {
       headers: { Accept: "application/json" },
     });
     if (response.status !== 200) {
+      await discardBody(response);
       return {
         result: "down",
         httpStatus: response.status,

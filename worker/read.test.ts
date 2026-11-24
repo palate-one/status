@@ -304,15 +304,13 @@ describe("public status routing", () => {
     expect(cache.put).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["POST", "/api/status", "GET"],
-  ])("returns 405 and Allow for %s %s", async (method, path, allow) => {
+  it("returns 405 and Allow for a status write", async () => {
     const { response } = await fetchStatus(
-      new Request(`https://status.palate.one${path}`, { method }),
+      new Request("https://status.palate.one/api/status", { method: "POST" }),
     );
 
     expect(response.status).toBe(405);
-    expect(response.headers.get("Allow")).toBe(allow);
+    expect(response.headers.get("Allow")).toBe("GET");
   });
 
   it.each([

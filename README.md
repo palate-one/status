@@ -25,7 +25,7 @@ D1 일별 집계
 - Worker는 `/api/status`를 먼저 처리하고, 나머지 요청은 Static Assets로 전달한다.
 - D1은 원시 관측값을 35일 동안 보관한다. 현재 구성요소 상태, UTC 일별 집계, 최초 관측 시각, 최근 35일의 공개 상태 스냅샷도 함께 관리한다.
 - Cron Trigger는 매시 3분부터 5분마다 `palate.one`과 `api.palate.one/readyz`만 확인한다. `global_fetch_strictly_public`을 켜서 같은 zone의 요청도 공개 경로로 나간다. D1 batch는 관측값, 상태, 집계, 공개 상태 스냅샷을 모두 반영하거나 모두 롤백한다.
-- `정상`과 `문제 발생`이 바뀔 때만 Telegram으로 알린다. Worker secret `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`가 없으면 관측은 저장하고 알림만 건너뛴다.
+- `문제 발생`으로 바뀌거나 거기서 `정상`으로 돌아올 때만 Telegram으로 알린다. 관측이 15분 넘게 끊긴 장애는 다시 알리거나 복구 알림이 빠질 수 있다. Worker secret `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`가 없으면 관측은 저장하고 알림만 건너뛴다.
 - 공개 상태 API는 쿼리 문자열이 있는 요청을 거부한다. 성공 응답만 데이터센터별 Cache API에 60초 동안 저장하고, 캐시 미스는 위치별로 분당 5회까지 허용한다. 캐시 미스 한 번은 D1의 공개 상태 스냅샷 한 행만 읽는다.
 - 주간 기록은 끝난 ISO 주차만 공개 JSON으로 저장한다. 기존 기록은 덮어쓰지 않는다.
 
@@ -65,10 +65,15 @@ Bun 1.3.12와 Node.js 호환 도구, Cloudflare Wrangler가 필요하다.
 ```sh
 bun install --frozen-lockfile
 bunx wrangler d1 migrations apply palate-status --local
-bun run dev -- --test-scheduled
+bun run dev
 ```
 
-관측을 한 번 실행하려면 다른 터미널에서 `curl "http://localhost:8787/__scheduled?cron=3-58/5+*+*+*+*"`를 부른다. 예약 시각은 매시 3분부터 5분 간격이어야 D1에 저장된다.
+관측을 한 번 실행하려면 다른 터미널에서 예약 시각을 넘겨 부른다. 예약 시각은 매시 3분부터 5분 간격이어야 D1에 저장된다.
+
+```sh
+slot=$(( ($(date +%s) - 180) / 300 * 300 + 180 ))
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=3-58/5+*+*+*+*&time=${slot}000"
+```
 
 주요 검증 명령:
 

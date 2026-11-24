@@ -5,6 +5,8 @@ import { createD1StatusStore, type StatusStore } from "./store";
 
 const RETENTION_DAYS = 35;
 const RETENTION_BATCH_SIZE = 1_000;
+const DAY_MS = 24 * 60 * 60 * 1_000;
+const MINUTE_MS = 60_000;
 
 export type MonitorOptions = {
   now?: () => Date;
@@ -21,24 +23,24 @@ export async function runScheduledChecks(
   const fetcher = options.fetcher ?? fetch;
   const now = (options.now ?? (() => new Date()))();
   const store = (options.storeFactory ?? createD1StatusStore)(env.DB);
-  const scheduledAt = isoSecond(new Date(Math.floor(scheduledTime / 60_000) * 60_000));
+  // D1은 초가 00인 시각만 받는다.
+  const scheduledAt = isoSecond(new Date(Math.floor(scheduledTime / MINUTE_MS) * MINUTE_MS));
 
   const checks = await Promise.all([checkWeb(fetcher, now), checkApi(fetcher, now)]);
-  const before = await store.readStatus(now);
-  await store.insertSamples(checks.map((check) => ({ ...check, scheduledAt })));
-  const after = await store.readStatus(now);
+  const { before, after } = await store.insertSamples(
+    checks.map((check) => ({ ...check, scheduledAt })),
+  );
 
-  const notifications = checks.flatMap((check) => {
-    const kind = notificationFor(check.component, before.states, after.states);
-    return kind === null ? [] : [formatNotification(kind, check)];
-  });
-  for (const text of notifications) {
-    await sendTelegram(text, env, fetcher);
+  for (const check of checks) {
+    const kind = notificationFor(check.component, before, after);
+    if (kind !== null) {
+      await sendTelegram(formatNotification(kind, check), env, fetcher);
+    }
   }
 
   try {
     await store.deleteExpiredSamples(
-      new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1_000),
+      new Date(now.getTime() - RETENTION_DAYS * DAY_MS),
       RETENTION_BATCH_SIZE,
     );
   } catch {

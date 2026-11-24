@@ -14,7 +14,7 @@ issue, pull request, commit, workflow log, incident/maintenance content에 다�
 - email, OAuth subject, passkey credential ID, 내부 user ID
 - private note, 정확한 GPS, private media path나 read token
 - 내부 host, private object key, 비공개 운영 식별자
-- raw provider payload, request/response body, 서명 header
+- raw provider payload, request/response body
 - 실제 사용자 또는 운영 데이터를 포함한 screenshot과 log
 
 노출이 의심되면 값을 다시 게시하거나 검증하려 하지 말고 즉시 해당 secret을 폐기·회전한 뒤 private channel로 범위와 시각을 전달한다.

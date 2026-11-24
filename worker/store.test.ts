@@ -107,8 +107,9 @@ describe("D1 status store", () => {
     ]);
     const snapshot = await store.readStatus(new Date("2026-08-09T00:03:00Z"));
 
-    expect(first).toEqual({ inserted: 1 });
-    expect(replay).toEqual({ inserted: 0 });
+    expect(first).toMatchObject({ inserted: 1 });
+    expect(replay).toMatchObject({ inserted: 0 });
+    expect(replay.before).toEqual(replay.after);
     expect(snapshot.states.find((state) => state.component === "web")).toMatchObject({
       status: "unknown",
       consecutiveFailures: 1,

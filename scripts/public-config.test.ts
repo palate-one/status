@@ -9,6 +9,7 @@ describe("public deployment config", () => {
       d1_databases: Array<{ database_id: string }>;
       triggers?: { crons: string[] };
       compatibility_flags?: string[];
+      observability: { traces?: { enabled: boolean } };
       routes?: Array<{ custom_domain: boolean; pattern: string }>;
       vars?: Record<string, string>;
     };
@@ -23,6 +24,8 @@ describe("public deployment config", () => {
     expect(config.vars).toBeUndefined();
     // 관측 시각은 D1 제약(:03 + 5n)과 같아야 하고, 같은 zone의 요청도 공개 경로로 나가야 한다.
     expect(config.triggers?.crons).toEqual(["3-58/5 * * * *"]);
+    // trace는 요청 URL을 남기고, Telegram URL에는 bot token이 들어간다.
+    expect(config.observability.traces).toEqual({ enabled: false });
     expect(config.compatibility_flags).toEqual(["global_fetch_strictly_public"]);
     expect(config.routes).toEqual([
       {

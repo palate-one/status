@@ -176,11 +176,11 @@ export function projectPublicStatus(
   };
 }
 
-function methodNotAllowed(allow: "GET" | "POST"): Response {
+function methodNotAllowed(): Response {
   return new Response("method not allowed", {
     status: 405,
     headers: {
-      Allow: allow,
+      Allow: "GET",
       "Content-Type": "text/plain; charset=utf-8",
     },
   });
@@ -212,7 +212,7 @@ export function createPublicStatusWorker(
 
       if (pathname === "/api/status") {
         if (request.method !== "GET") {
-          return methodNotAllowed("GET");
+          return methodNotAllowed();
         }
 
         if (url.search !== "") {

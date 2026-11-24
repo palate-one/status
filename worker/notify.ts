@@ -3,7 +3,8 @@ import type { MonitorCheck } from "./checks";
 import type { Env } from "./env";
 
 const TELEGRAM_TIMEOUT_MS = 10_000;
-const componentNames = { web: "palate.one Web", api: "api.palate.one API" } as const;
+const STATUS_PAGE = "https://status.palate.one/";
+const componentNames = { web: "palate.one", api: "api.palate.one" } as const;
 
 export type NotificationKind = "down" | "recovered";
 
@@ -27,10 +28,12 @@ export function notificationFor(
 export function formatNotification(kind: NotificationKind, check: MonitorCheck): string {
   const name = componentNames[check.component];
   if (kind === "recovered") {
-    return `🟢 ${name}가 복구됐어요\n\n확인 시각: ${check.checkedAt}`;
+    return `🟢 ${name} 복구\n\n확인 시각: ${check.checkedAt}\n${STATUS_PAGE}`;
   }
-  const reason = check.httpStatus === null ? check.failureCode : `HTTP ${check.httpStatus}`;
-  return `🔴 ${name}가 응답하지 않아요\n\n- ${reason}\n\n확인 시각: ${check.checkedAt}`;
+  // 본문 불일치는 상태 코드가 200이어도 실패다.
+  const reason =
+    check.failureCode === "http_status" ? `HTTP ${check.httpStatus}` : check.failureCode;
+  return `🔴 ${name} 응답 이상\n\n- ${reason}\n\n확인 시각: ${check.checkedAt}\n${STATUS_PAGE}`;
 }
 
 /** 알림 실패가 관측 저장을 막지 않는다. 응답 본문에는 bot token이 섞일 수 있어 기록하지 않는다. */
@@ -57,6 +60,7 @@ export async function sendTelegram(
         signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
       },
     );
+    await response.body?.cancel();
     if (!response.ok) {
       console.error(`telegram returned HTTP ${response.status}`);
     }
