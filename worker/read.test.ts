@@ -50,7 +50,6 @@ function createEnv(): Env {
     ASSETS: {
       fetch: vi.fn().mockResolvedValue(new Response("asset", { status: 200 })),
     } as unknown as Fetcher,
-    STATUS_INGEST_SECRET: "test-only-secret",
     STATUS_READ_LIMITER: {
       limit: vi.fn().mockResolvedValue({ success: true }),
     } as RateLimit,
@@ -307,7 +306,6 @@ describe("public status routing", () => {
 
   it.each([
     ["POST", "/api/status", "GET"],
-    ["GET", "/api/checks", "POST"],
   ])("returns 405 and Allow for %s %s", async (method, path, allow) => {
     const { response } = await fetchStatus(
       new Request(`https://status.palate.one${path}`, { method }),
@@ -317,9 +315,12 @@ describe("public status routing", () => {
     expect(response.headers.get("Allow")).toBe(allow);
   });
 
-  it("returns 404 for an unsupported API route", async () => {
+  it.each([
+    ["GET", "/api/internal"],
+    ["POST", "/api/checks"],
+  ])("returns 404 for %s %s", async (method, path) => {
     const { response } = await fetchStatus(
-      new Request("https://status.palate.one/api/internal"),
+      new Request(`https://status.palate.one${path}`, { method }),
     );
 
     expect(response.status).toBe(404);

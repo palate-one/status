@@ -10,7 +10,7 @@
 
 issue, pull request, commit, workflow log, incident/maintenance content에 다음 정보를 공개하지 않는다.
 
-- access token, refresh token, HMAC secret, session, cookie, API key
+- access token, refresh token, bot token, session, cookie, API key
 - email, OAuth subject, passkey credential ID, 내부 user ID
 - private note, 정확한 GPS, private media path나 read token
 - 내부 host, private object key, 비공개 운영 식별자
@@ -23,4 +23,4 @@ issue, pull request, commit, workflow log, incident/maintenance content에 다�
 
 장애와 점검 공지는 사용자 영향과 확인된 공개 사실만 담는다. 원인이 확정되지 않았으면 추측하지 않는다. 개인 데이터나 내부 식별자는 삭제가 아니라 처음부터 포함하지 않는다.
 
-보안 수정은 generic public error, 고정된 endpoint/host allowlist, HMAC 검증, replay idempotency, D1 query bound를 약화시키지 않아야 한다.
+보안 수정은 generic public error, 고정된 endpoint/host allowlist, 시각별 관측 idempotency, D1 query bound를 약화시키지 않아야 한다.

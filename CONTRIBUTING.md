@@ -23,7 +23,7 @@
 
 - `component` 필드에는 `web`, `api`만 사용한다.
 - `token`, `secret`, 사용자 데이터, 내부 `host`, `provider` 원문은 커밋하지 않는다.
-- 모니터 대상, HMAC 전송 경로, 서명 규약 변경은 보안 경계 변경으로 취급한다.
+- 모니터 대상과 예약 시각, 알림 경로 변경은 보안 경계 변경으로 취급한다.
 - `migration`은 새 파일로만 추가한다. 이미 배포된 파일은 수정하지 않는다.
 - 생성된 `worker-configuration.d.ts`는 `bunx wrangler types`가 만든 결과 그대로 유지한다.
 

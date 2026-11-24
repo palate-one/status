@@ -6,7 +6,6 @@ import type {
 } from "../src/status/types";
 import { calculateUptime, expectedSlotsForDay } from "../src/status/uptime";
 import type { Env } from "./env";
-import { createWorker as createIngestWorker } from "./ingest";
 import { createD1StatusStore, type DailyAggregateRow, type StatusSnapshot, type StatusStore } from "./store";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -205,7 +204,6 @@ export function createPublicStatusWorker(
 } {
   const now = options.now ?? (() => new Date());
   const storeFactory = options.storeFactory ?? createD1StatusStore;
-  const ingestWorker = createIngestWorker({ now, storeFactory });
 
   return {
     async fetch(request, env, ctx): Promise<Response> {
@@ -275,13 +273,6 @@ export function createPublicStatusWorker(
             headers: { "Content-Type": "text/plain; charset=utf-8" },
           });
         }
-      }
-
-      if (pathname === "/api/checks") {
-        if (request.method !== "POST") {
-          return methodNotAllowed("POST");
-        }
-        return ingestWorker.fetch(request, env, ctx);
       }
 
       if (pathname === "/api" || pathname.startsWith("/api/")) {

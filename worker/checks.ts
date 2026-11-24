@@ -2,7 +2,7 @@ import type {
   CheckSample,
   ComponentId,
   FailureCode,
-} from "../../src/status/types";
+} from "../src/status/types";
 
 const WEB_TARGET = "https://palate.one/";
 const API_TARGET = "https://api.palate.one/readyz";
