@@ -91,7 +91,7 @@ git diff --check
 
 이 서비스는 Cloudflare Workers/D1의 무료 사용량 안에서 운영하는 것을 목표로 한다. Cron Trigger는 하루 288번 실행된다. GitHub `schedule`은 실행 시각을 보장하지 않고 60일 동안 변경이 없는 공개 저장소에서는 꺼지므로 관측에 쓰지 않는다. 주간 기록 workflow도 같은 이유로 꺼질 수 있다. Cloudflare 무료 사용량은 계정 전체에서 공유된다. Cache API와 Worker rate limit은 데이터센터별로 적용되고, rate limit은 일시적으로 완전히 일치하지 않을 수 있다. 배포 전에는 최신 공식 한도와 계정 사용량을 다시 확인해야 한다.
 
-`main`에 합쳐진 변경은 `Deploy` workflow가 검사한 뒤 배포한다. 저장소 secret `CLOUDFLARE_API_TOKEN`과 `CLOUDFLARE_ACCOUNT_ID`가 필요하고, `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`가 있으면 Worker secret에도 함께 넣는다. D1 migration은 자동으로 적용하지 않는다.
+`main`에 합쳐진 변경은 `Deploy` workflow가 검사한 뒤 배포한다. 저장소 secret `CLOUDFLARE_API_TOKEN`과 `CLOUDFLARE_ACCOUNT_ID`가 필요하고, `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`가 있으면 Worker secret에도 함께 넣는다. D1 migration은 자동으로 적용하지 않으므로, migration이 있는 변경은 머지하기 전에 `bunx wrangler d1 migrations apply palate-status --remote`로 먼저 적용한다.
 
 ## 증거 경계
 
