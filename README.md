@@ -85,13 +85,13 @@ bun run cf:build
 git diff --check
 ```
 
-`bun run cf:build`는 실제로 배포하지 않는 dry run이다. `wrangler.jsonc`에는 공개 가능한 운영 D1 식별자와 사용자 지정 도메인만 있다. Telegram 값은 Cloudflare Worker의 secret으로만 관리하며 저장소에 두지 않는다.
+`bun run cf:build`는 실제로 배포하지 않는 dry run이다. `wrangler.jsonc`에는 공개 가능한 운영 D1 식별자와 사용자 지정 도메인만 있다. Cloudflare와 Telegram 값은 GitHub Actions와 Cloudflare Worker의 secret으로만 관리하며 저장소에 두지 않는다.
 
 ## 무료 운영 경계
 
 이 서비스는 Cloudflare Workers/D1의 무료 사용량 안에서 운영하는 것을 목표로 한다. Cron Trigger는 하루 288번 실행된다. GitHub `schedule`은 실행 시각을 보장하지 않고 60일 동안 변경이 없는 공개 저장소에서는 꺼지므로 관측에 쓰지 않는다. 주간 기록 workflow도 같은 이유로 꺼질 수 있다. Cloudflare 무료 사용량은 계정 전체에서 공유된다. Cache API와 Worker rate limit은 데이터센터별로 적용되고, rate limit은 일시적으로 완전히 일치하지 않을 수 있다. 배포 전에는 최신 공식 한도와 계정 사용량을 다시 확인해야 한다.
 
-Workers Builds의 빌드·배포 명령과 감시 경로는 Cloudflare 대시보드에서 설정한다. Wrangler의 사용자 지정 빌드 설정만으로는 이를 대신할 수 없다. 주간 기록만 바뀐 커밋을 빌드에서 정확히 제외할 수 없다면 주 1회 빌드를 허용하고, 별도 diff script는 추가하지 않는다.
+`main`에 합쳐진 변경은 `Deploy` workflow가 검사한 뒤 배포한다. 저장소 secret `CLOUDFLARE_API_TOKEN`과 `CLOUDFLARE_ACCOUNT_ID`가 필요하고, `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`가 있으면 Worker secret에도 함께 넣는다. D1 migration은 자동으로 적용하지 않는다.
 
 ## 증거 경계
 
