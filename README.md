@@ -5,10 +5,8 @@
 ## 구조
 
 ```text
-GitHub Actions 모니터 (5분 간격)
+Cloudflare Worker Cron Trigger (5분 간격)
   -> Web / API 공개 상태 확인
-  -> HMAC 서명 POST /api/checks
-  -> Cloudflare Worker
   -> D1 관측값 batch, 구성요소 상태, 일별 집계, 공개 상태 스냅샷
   -> GET /api/status
   -> 캐시 미스 rate limit + 60초 Cache API
@@ -24,9 +22,10 @@ D1 일별 집계
 ```
 
 - Astro는 공개 상태 페이지와 404 페이지, 장애 공지, 점검 이력을 정적으로 빌드한다.
-- Worker는 `/api/checks`와 `/api/status`를 먼저 처리하고, 나머지 요청은 Static Assets로 전달한다.
+- Worker는 `/api/status`를 먼저 처리하고, 나머지 요청은 Static Assets로 전달한다.
 - D1은 원시 관측값을 35일 동안 보관한다. 현재 구성요소 상태, UTC 일별 집계, 최초 관측 시각, 최근 35일의 공개 상태 스냅샷도 함께 관리한다.
-- GitHub Actions 모니터는 `palate.one`과 `api.palate.one/readyz`만 확인한다. 두 구성요소의 결과를 하나의 서명된 요청으로 보내며, D1 batch는 관측값, 상태, 집계, 공개 상태 스냅샷을 모두 반영하거나 모두 롤백한다.
+- Cron Trigger는 매시 3분부터 5분마다 `palate.one`과 `api.palate.one/readyz`만 확인한다. `global_fetch_strictly_public`을 켜서 같은 zone의 요청도 공개 경로로 나간다. D1 batch는 관측값, 상태, 집계, 공개 상태 스냅샷을 모두 반영하거나 모두 롤백한다.
+- `문제 발생`으로 바뀌거나 거기서 `정상`으로 돌아올 때만 Telegram으로 알린다. 관측이 15분 넘게 끊긴 장애는 다시 알리거나 복구 알림이 빠질 수 있다. Worker secret `TELEGRAM_BOT_TOKEN`과 `TELEGRAM_CHAT_ID`가 없으면 관측은 저장하고 알림만 건너뛴다.
 - 공개 상태 API는 쿼리 문자열이 있는 요청을 거부한다. 성공 응답만 데이터센터별 Cache API에 60초 동안 저장하고, 캐시 미스는 위치별로 분당 5회까지 허용한다. 캐시 미스 한 번은 D1의 공개 상태 스냅샷 한 행만 읽는다.
 - 주간 기록은 끝난 ISO 주차만 공개 JSON으로 저장한다. 기존 기록은 덮어쓰지 않는다.
 
@@ -66,12 +65,15 @@ Bun 1.3.12와 Node.js 호환 도구, Cloudflare Wrangler가 필요하다.
 ```sh
 bun install --frozen-lockfile
 bunx wrangler d1 migrations apply palate-status --local
-umask 077
-openssl rand -hex 32 | awk '{ print "STATUS_INGEST_SECRET=" $0 }' > .dev.vars
 bun run dev
 ```
 
-Wrangler는 `.dev.vars`를 로컬 Worker binding으로 읽는다. 이 파일은 Git에서 제외하며 커밋하지 않는다. 작업이 끝나면 로컬 secret 파일을 삭제한다.
+관측을 한 번 실행하려면 다른 터미널에서 예약 시각을 넘겨 부른다. 예약 시각은 매시 3분부터 5분 간격이어야 D1에 저장된다.
+
+```sh
+slot=$(( ($(date +%s) - 180) / 300 * 300 + 180 ))
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=3-58/5+*+*+*+*&time=${slot}000"
+```
 
 주요 검증 명령:
 
@@ -83,11 +85,11 @@ bun run cf:build
 git diff --check
 ```
 
-`bun run cf:build`는 실제로 배포하지 않는 dry run이다. `wrangler.jsonc`에는 공개 가능한 운영 D1 식별자와 사용자 지정 도메인만 있다. `STATUS_INGEST_SECRET` 값은 Cloudflare Worker와 GitHub Actions의 secret으로만 관리하며 저장소에 두지 않는다.
+`bun run cf:build`는 실제로 배포하지 않는 dry run이다. `wrangler.jsonc`에는 공개 가능한 운영 D1 식별자와 사용자 지정 도메인만 있다. Telegram 값은 Cloudflare Worker의 secret으로만 관리하며 저장소에 두지 않는다.
 
 ## 무료 운영 경계
 
-이 서비스는 GitHub Actions와 Cloudflare Workers/D1의 무료 사용량 안에서 운영하는 것을 목표로 한다. 5분 `schedule`은 하루 최대 288번 실행된다. GitHub `schedule`은 정확한 실행 시각을 보장하지 않으며, Cloudflare 무료 사용량은 계정 전체에서 공유된다. Cache API와 Worker rate limit은 데이터센터별로 적용되고, rate limit은 일시적으로 완전히 일치하지 않을 수 있다. 배포 전에는 최신 공식 한도와 계정 사용량을 다시 확인해야 한다.
+이 서비스는 Cloudflare Workers/D1의 무료 사용량 안에서 운영하는 것을 목표로 한다. Cron Trigger는 하루 288번 실행된다. GitHub `schedule`은 실행 시각을 보장하지 않고 60일 동안 변경이 없는 공개 저장소에서는 꺼지므로 관측에 쓰지 않는다. 주간 기록 workflow도 같은 이유로 꺼질 수 있다. Cloudflare 무료 사용량은 계정 전체에서 공유된다. Cache API와 Worker rate limit은 데이터센터별로 적용되고, rate limit은 일시적으로 완전히 일치하지 않을 수 있다. 배포 전에는 최신 공식 한도와 계정 사용량을 다시 확인해야 한다.
 
 Workers Builds의 빌드·배포 명령과 감시 경로는 Cloudflare 대시보드에서 설정한다. Wrangler의 사용자 지정 빌드 설정만으로는 이를 대신할 수 없다. 주간 기록만 바뀐 커밋을 빌드에서 정확히 제외할 수 없다면 주 1회 빌드를 허용하고, 별도 diff script는 추가하지 않는다.
 

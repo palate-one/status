@@ -21,8 +21,15 @@ export type StatusSnapshot = {
   daily: DailyAggregateRow[];
 };
 
+export type InsertResult = {
+  inserted: number;
+  before: ComponentState[];
+  after: ComponentState[];
+};
+
 export type StatusStore = {
-  insertSamples(samples: readonly CheckSample[]): Promise<{ inserted: number }>;
+  /** 저장 전후의 구성요소 상태를 같은 트랜잭션에서 읽어, 겹친 실행이 같은 전환을 두 번 보지 않게 한다. */
+  insertSamples(samples: readonly CheckSample[]): Promise<InsertResult>;
   readStatus(now: Date): Promise<StatusSnapshot>;
   deleteExpiredSamples(cutoff: Date, limit: number): Promise<number>;
 };
@@ -107,7 +114,7 @@ function parseStoredRows<T>(value: string): T[] {
 
 export function createD1StatusStore(db: D1Database): StatusStore {
   return {
-    async insertSamples(samples: readonly CheckSample[]): Promise<{ inserted: number }> {
+    async insertSamples(samples: readonly CheckSample[]): Promise<InsertResult> {
       if (samples.length < 1 || samples.length > 2) {
         throw new RangeError("sample batch must contain one or two samples");
       }
@@ -125,8 +132,10 @@ export function createD1StatusStore(db: D1Database): StatusStore {
         ON CONFLICT (component, scheduled_at) DO NOTHING
         RETURNING id
       `);
+      const readStates = db.prepare("SELECT * FROM component_state ORDER BY component");
       const results = await db.batch(
         [
+          readStates,
           ...samples.map((sample) =>
             statement.bind(
               sample.component,
@@ -178,13 +187,16 @@ export function createD1StatusStore(db: D1Database): StatusStore {
               )
             WHERE id = 1
           `),
+          readStates,
         ],
       );
 
       return {
         inserted: results
-          .slice(0, samples.length)
+          .slice(1, samples.length + 1)
           .reduce((total, result) => total + result.results.length, 0),
+        before: (results.at(0)?.results as StateRow[]).map(mapState),
+        after: (results.at(-1)?.results as StateRow[]).map(mapState),
       };
     },
 

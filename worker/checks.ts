@@ -2,7 +2,7 @@ import type {
   CheckSample,
   ComponentId,
   FailureCode,
-} from "../../src/status/types";
+} from "../src/status/types";
 
 const WEB_TARGET = "https://palate.one/";
 const API_TARGET = "https://api.palate.one/readyz";
@@ -207,6 +207,7 @@ async function checkApiAttempt(fetcher: typeof fetch): Promise<AttemptResult> {
       headers: { Accept: "application/json" },
     });
     if (response.status !== 200) {
+      await discardBody(response);
       return {
         result: "down",
         httpStatus: response.status,
